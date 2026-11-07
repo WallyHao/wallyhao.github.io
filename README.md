@@ -1,247 +1,274 @@
 # blog-wallyhao
 
-一个极简的个人博客，基于 [Quartz v5](https://quartz.jzhao.xyz/)。
+A minimal personal blog built with [Quartz v5](https://quartz.jzhao.xyz/).
 
-> 文章用 [org-lite](https://github.com/WallyHao/org-lite) 语法写在 `org/`，
-> 构建时转成 Markdown 交给 Quartz。**给智能体/贡献者的完整说明见 [AGENTS.md](AGENTS.md)**，
-> 语法文档见 [`docs/org/`](docs/org/)。
+> Posts are written in [org-lite](https://github.com/WallyHao/org-lite) syntax under `org/`
+> and converted to Markdown at build time. **See [AGENTS.md](AGENTS.md) for the full guide for
+> agents and contributors.** The syntax reference lives in [`docs/org/`](docs/org/).
 
-设计上只有四条约束，其余都是推论：
+The design follows four constraints; everything else derives from them:
 
-1. **数据层只有文档。** `org/` 下全是 org-lite 文档，没有数据库、CMS 和额外的 JSON 数据文件。
-2. **派生数据只存在于构建期。** 标签、目录、最近更新、阅读时间都是构建时从文档里算出来的。
-3. **功能靠插件扩展。** 功能要么是 npm 上的插件，要么是 `plugins/` 下的本地插件，在 `quartz.config.yaml` 里装配。
-4. **前端不能写回数据层。** 站点是纯静态产物，没有可写的服务端接口。
+1. **Documents are the only data layer.** Everything under `org/` is an org-lite document —
+   no database, no CMS, no extra structured data files.
+2. **Derived data exists only at build time.** Tags, listings, recent posts and reading time
+   are computed from the documents during the build.
+3. **Features are added through plugins.** A feature is either an npm plugin or a local
+   plugin under `plugins/`, wired in `quartz.config.yaml`.
+4. **The frontend cannot write back.** The site is static output with no writable server
+   endpoint.
 
 ---
 
-## 快速开始
+## Quick start
 
-需要 Node.js >= 24.12（org-lite 的要求）。
+Requires Node.js >= 24.12 (org-lite requirement).
 
 ```bash
-npm ci            # 首次安装依赖（用 npm i 也可以）
-npm run org       # org/ → content/，只做转换
-npm run preview   # 转换 + 本地预览 http://localhost:8080
-npm run build     # 转换 + 构建，产物在 public/
+npm ci            # first install (npm i also works)
+npm run org       # org/ -> content/, conversion only
+npm run preview   # convert + serve on http://localhost:8080
+npm run build     # convert + build, output in public/
 ```
 
-`content/` 是生成物，直接 `npx quartz build` 前记得先 `npm run org`。
-改完 `quartz.config.yaml` 或插件后重启 dev server 最稳妥。
+`content/` is generated: run `npm run org` before a bare `npx quartz build`. Restart the dev
+server after changing `quartz.config.yaml` or a plugin.
 
-## 目录结构
+## Layout
 
 ```
-org/                唯一数据源：org-lite 文档
-  index.org         首页
-  about.org         关于（unlisted）
-  posts/            文章目录，自动生成 /posts 列表页
-content/            org → md 的生成物（已 gitignore）
-scripts/org-to-md.mjs  转换器
-vendor/org-lite/   org-lite 解析器副本（上游 dist）
-docs/org/          org-lite 语法文档拷贝（写作前先看这里）
-AGENTS.md          智能体/贡献者说明
-quartz.config.yaml  站点参数 + 插件装配 + 页面骨架
-quartz.ts           TS 覆写层：函数型配置、自定义 layout 条件
-plugins/            本地插件（reading-time、default-theme）
-quartz/             Quartz 内核，含插件管线
-public/             构建产物（已 gitignore）
+org/                the only source of truth: org-lite documents
+  index.org         home page
+  about.org         about page (unlisted)
+  posts/            posts; the /posts listing page is generated
+content/            generated Markdown (gitignored)
+scripts/org-to-md.mjs  converter
+vendor/org-lite/    org-lite parser snapshot (upstream dist)
+docs/org/           org-lite syntax documentation (read this before writing)
+AGENTS.md           guide for agents and contributors
+quartz.config.yaml  site settings, plugin wiring, page skeleton
+quartz.ts           TypeScript override layer (custom layout conditions)
+plugins/            local plugins (reading-time, default-theme)
+quartz/             Quartz core and plugin pipeline
+public/             build output (gitignored)
 ```
 
-`quartz.config.yaml` 里没有内容数据，`org/` 里没有配置。两者不交叉。
-`content/` 只是中间产物，别手改——下次 `npm run org` 会覆盖它。
+`quartz.config.yaml` holds no content data and `org/` holds no configuration; the two never
+overlap. `content/` is an intermediate artifact — do not edit it, the next `npm run org`
+overwrites it.
 
-## 写文章
+## Writing a post
 
-在 `org/posts/` 下新建一个 `.org` 文件，文件名就是 URL（slug）。
-文档顶部的 `#+KEY:` 行是元数据，会被转换成 Quartz 需要的 YAML frontmatter：
+Create a `.org` file under `org/posts/`; the file name is the URL slug. Leading `#+KEY:`
+lines are metadata and become the YAML frontmatter Quartz expects:
 
 ```org
-#+TITLE: 标题
+#+TITLE: Title
 #+DATE: 2025-11-05
-#+DESCRIPTION: 一句话摘要，用于列表页、搜索和 og:description。
+#+DESCRIPTION: One-sentence summary used by listings, search and og:description.
 #+TAGS: quartz, architecture
 
-正文……
+Body text with *bold*, /italic/, _underline_, +strike+ and ~inline code~.
 
-** 一节
+** A section
 
-段落，包含 *粗体*、/斜体/、_下划线_、+删除线+、~行内代码~。
+A paragraph.
 ```
 
-| org 元数据      | frontmatter   | 作用                                                |
-| --------------- | ------------- | --------------------------------------------------- |
-| `#+TITLE`       | `title`       | 标题，缺省时用文件名                                |
-| `#+DATE`        | `date`        | 日期，缺省时回退到文件时间（生成物没有 git 历史）   |
-| `#+DESCRIPTION` | `description` | 摘要，用于列表、搜索、RSS                           |
-| `#+TAGS`        | `tags`        | 空格或逗号分隔，自动生成 `/tags/<tag>` 页面         |
-| `#+DRAFT`       | `draft`       | `true` 时不发布                                     |
-| `#+UNLISTED`    | `unlisted`    | `true` 时不进列表 / RSS / 搜索，但仍可通过 URL 访问 |
-| `#+ALIASES`     | `aliases`     | 旧链接，自动生成跳转页                              |
+| org metadata    | frontmatter   | Purpose                                                                  |
+| --------------- | ------------- | ------------------------------------------------------------------------ |
+| `#+TITLE`       | `title`       | Title, falls back to the file name                                       |
+| `#+DATE`        | `date`        | Date, falls back to the file mtime (generated files have no git history) |
+| `#+DESCRIPTION` | `description` | Summary used by listings, search and RSS                                 |
+| `#+TAGS`        | `tags`        | Space or comma separated; `/tags/<tag>` pages are generated              |
+| `#+DRAFT`       | `draft`       | `true` keeps it unpublished                                              |
+| `#+UNLISTED`    | `unlisted`    | `true` hides it from listings, RSS and search                            |
+| `#+ALIASES`     | `aliases`     | Old links that should redirect                                           |
 
-链接一律写 `file:` 形式，转换器会翻译成站内路径：
+Links must use the `file:` prefix so the converter can translate them into site paths:
 
 ```org
-[[file:posts/][全部文章]]         → /posts/
-[[file:about.org][关于]]          → /about
-[[file:notes.org::*计划][计划]]   → /notes#计划
-[[id:project-001][项目]]          → 跨文档 ID，两遍扫描后解析
-[[https://example.com][外链]]     → 外部链接
+[[file:posts/][All posts]]        -> /posts/
+[[file:about.org][About]]         -> /about
+[[file:notes.org::*Plan][Plan]]   -> /notes#plan
+[[id:project-001][Project]]       -> cross-document ID, resolved in a second pass
+[[https://example.com][External]] -> external link
 ```
 
-`*粗体*` 会转成 `**粗体**`，`/斜体/` → `*斜体*`，`~代码~` → `` `代码` ``，
-`_下划线_` 与上下标走内联 HTML。
+`*bold*` becomes `**bold**`, `/italic/` becomes `*italic*`, `~code~` becomes `` `code` ``,
+while `_underline_` and sub/superscripts are emitted as inline HTML.
 
-### 这是 org-lite，不是 Org mode
+### This is org-lite, not Org mode
 
-解析器就是 `vendor/org-lite/`，只认 org-lite 的语法子集，不加载 Emacs，也不支持完整 Org。
-下面这些完整 Org 的写法会被当成**普通文字**（不报错、不解释），不要指望它们生效：
+The parser is `vendor/org-lite/`. It implements a defined subset, does not load Emacs and does
+not support full Org. The following full-Org constructs are treated as **plain text** (no
+error, no interpretation):
 
-- 标题上的 TODO 状态、优先级、标签（`* TODO [#A] 任务 :work:` 里的 `TODO` 只是文字）
-- 时间戳、`SCHEDULED:` / `DEADLINE:` / `CLOCK:`
-- 泛用抽屉（`LOGBOOK` 等）、`#+FILETAGS:` / `#+OPTIONS:` / `#+INCLUDE:` / `#+MACRO:` / `#+CALL:`
-- 表格公式 `#+TBLFM:`
-- `VERSE` / `CENTER` / `EXPORT` / 自定义块
-- 单行原样区 `: 原文`
-- 匿名脚注 `[fn::...]`、radio target `<<<x>>>`
-- `+ 项目`、`1) 项目`、缩进的 `* 项目` 这几种列表写法
-- 裸 URL、`<https://…>`、`mailto:` / `attachment:` 链接
+- TODO states, priorities and headline tags (`TODO` in `* TODO [#A] Task :work:` is just text)
+- Timestamps, `SCHEDULED:` / `DEADLINE:` / `CLOCK:`
+- Generic drawers such as `LOGBOOK`, and `#+FILETAGS:` / `#+OPTIONS:` / `#+INCLUDE:` /
+  `#+MACRO:` / `#+CALL:`
+- Table formulas `#+TBLFM:`
+- `VERSE` / `CENTER` / `EXPORT` and custom blocks
+- Single-line verbatim regions (`: text`)
+- Anonymous footnotes `[fn::...]` and radio targets `<<<x>>>`
+- The `+ item`, `1) item` and indented `* item` list styles
+- Bare URLs, `<https://...>` and `mailto:` / `attachment:` links
 
-### 转换器的边界
+### Converter boundaries
 
-在 org-lite 支持的范围内，映射是完整的；下面这些是有意的降级：
+Within the org-lite subset the mapping is complete. These are intentional degradations:
 
-- **复选框只有两态**：`[X]` / `[ ]`；`[-]` 输出 `[ ]` 并用 `<!-- partial -->` 注释保留原状态。
-- **没有 callout**：org-lite 只有 QUOTE 块，转成 Markdown 引用块。
-- **`#+CAPTION:` 变成斜体段落**、`#+NAME:` 变成 `<a id>` 锚点：没有图表编号体系。
-- **`::NN` 行号、`::/正则/` 选择器丢弃**：静态站点里没有对应物，链接只保留文件部分。
-- **有序列表重新编号**：`1.` `3.` 会变成 `1.` `2.`（Markdown 的编号不参与渲染）。
-- **属性抽屉只取 `ID` / `CUSTOM_ID`**：其余键（`OWNER` 等）丢弃。
-- **注释块**（`# 注释` / `#+BEGIN_COMMENT`）不输出。
-- **未知 `#+` 行原样保留为文本**（org-lite 的语义如此）。
+- **Checkboxes have two states.** `[X]` / `[ ]`; `[-]` becomes `[ ]` plus a
+  `<!-- partial -->` comment so the original state survives in the source.
+- **No callouts.** org-lite only has QUOTE blocks, which become Markdown blockquotes.
+- **`#+CAPTION:` becomes an italic paragraph**, `#+NAME:` becomes an `<a id>` anchor; there is
+  no figure numbering.
+- **`::NN` line selectors and `::/regexp/` selectors are dropped**; only the file part of the
+  link is kept, since a static site has nothing to select.
+- **Ordered lists are renumbered.** `1.` `3.` becomes `1.` `2.` (Markdown numbering is not
+  rendered).
+- **Property drawers only contribute `ID` / `CUSTOM_ID`**; other keys (`OWNER`, ...) are dropped.
+- **Comment blocks** (`# comment` / `#+BEGIN_COMMENT`) are not emitted.
+- **Unknown `#+` lines are kept as text**, which is org-lite's own semantics.
 
-`org/` 下的非 `.org` 文件（图片等）会同步到 `content/`，文件链接可以直接用。
-转换时如果碰到 org-lite 认不出的语法，会打印 `unsupported` / `unclosed` / `orphan` 提示和行号。
+Non-`.org` files under `org/` (images and so on) are copied to `content/`, so file links work
+directly. Unrecognized syntax produces `unsupported` / `unclosed` / `orphan` warnings with
+line numbers during conversion.
 
-## 改站点
+## Customizing the site
 
-站点级参数都在 `quartz.config.yaml` 的 `configuration` 段：
+Site-level settings live in the `configuration` section of `quartz.config.yaml`:
 
-- `pageTitle` / `pageTitleSuffix`：站点标题
-- `baseUrl`：**部署前必须改成自己的域名**（不带 `https://`），影响 RSS、sitemap、canonical URL
-- `locale`：界面语言，当前 `zh-CN`
-- `theme.colors` / `theme.typography`：配色与字体
-- `analytics`：当前为 `null`，不加载任何统计脚本
+- `pageTitle` / `pageTitleSuffix`: site title
+- `baseUrl`: **must be your domain before deploying** (no `https://`); used by RSS, sitemap and
+  canonical URLs
+- `locale`: UI language, currently `zh-CN`
+- `theme.colors` / `theme.typography`: palette and fonts
+- `analytics`: currently `null`, no analytics script is loaded
 
-页面骨架在文件末尾的 `layout` 段：`left` / `right` / `beforeBody` / `afterBody` / `footer`
-每个插槽里放哪些组件、优先级多少。例如想把文件树侧边栏加回来，把 `explorer`
-的 `enabled` 改成 `true` 即可。
+The page skeleton is the `layout` section at the end of the file: which components go into
+`left` / `right` / `beforeBody` / `afterBody` / `footer` and at what priority. To bring the
+file tree back, for example, set `enabled: true` on `explorer`.
 
-## 外观
+## Appearance
 
-三层叠起来：
+Three layers stack up:
 
-| 层       | 文件                                                                  | 作用                                                              |
-| -------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| 结构     | `@quartz-themes/core` + `theme: ink-paper`                            | 间距、标题层级、引用块、表格等版式                                |
-| 配色     | `quartz.config.yaml` 的 `theme.colors` + `quartz/styles/custom.scss`  | 墨观 Inkstone 的 **宣纸 Dimmed**（浅色）/ **玄墨 Dimmed**（深色） |
-| 字体     | `quartz/styles/lxgw-wenkai.scss` + `quartz/static/fonts/lxgw-wenkai/` | 霞鹜文楷 Screen，97 个 woff2 子集自托管                           |
-| 默认主题 | `plugins/default-theme/`                                              | 首次访问固定亮色，不跟随系统深色偏好；用户切换后以自己选择为准    |
+| Layer        | File                                                                  | Purpose                                                          |
+| ------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Structure    | `@quartz-themes/core` with `theme: ink-paper`                         | Spacing, heading scale, quote and table styling                  |
+| Palette      | `theme.colors` in `quartz.config.yaml` + `quartz/styles/custom.scss`  | Inkstone **Xuanzhi Dimmed** (light) / **Xuanmo Dimmed** (dark)   |
+| Type         | `quartz/styles/lxgw-wenkai.scss` + `quartz/static/fonts/lxgw-wenkai/` | LXGW WenKai Screen, 97 self-hosted woff2 subsets                 |
+| Default mode | `plugins/default-theme/`                                              | First visit is light instead of following the OS dark preference |
 
-`custom.scss` 里的变量覆盖写在 Quartz 的 `@layer quartz-base` **之外**，
-所以无条件压过主题自带的值——想改颜色，只改那里和 `theme.colors` 两处保持一致即可。
+Variable overrides in `custom.scss` sit **outside** Quartz's `@layer quartz-base`, so they
+unconditionally win over the theme. When changing colors, keep that file and `theme.colors`
+in sync.
 
-换字体：
+To change the font:
 
-1. 把新的 webfont 的 `*.woff2` 放进 `quartz/static/fonts/<名字>/files/`；
-2. 用它的 CSS 生成一份 `quartz/styles/<名字>.scss`，把 `url('./files/...')`
-   改成 `url('./static/fonts/<名字>/files/...')`；
-3. 在 `custom.scss` 顶部 `@use "./<名字>.scss";`，并把 `--bodyFont` / `--headerFont` /
-   `--titleFont` / `--font-text` / `--font-interface` / `--font-default` 换成新字体名；
-4. `quartz.config.yaml` 里 `theme.typography` 同步改名，保持 `fontOrigin: local`。
+1. Put the new webfont's `*.woff2` files into `quartz/static/fonts/<name>/files/`;
+2. Turn its CSS into `quartz/styles/<name>.scss`, rewriting `url('./files/...')` to
+   `url('./static/fonts/<name>/files/...')`;
+3. `@use "./<name>.scss";` at the top of `custom.scss` and point `--bodyFont`, `--headerFont`,
+   `--titleFont`, `--font-text`, `--font-interface` and `--font-default` at the new family;
+4. Rename it in `theme.typography` in `quartz.config.yaml`, keeping `fontOrigin: local`.
 
-字体自托管意味着不依赖 Google Fonts / jsDelivr，代价是仓库里多了约 5 MB 的 woff2
-（浏览器只会按 `unicode-range` 下载真正用到的子集，首屏通常几百 KB）。
+Self-hosting the font removes the dependency on Google Fonts and jsDelivr, at the cost of
+about 5 MB of woff2 in the repository (the browser only downloads the `unicode-range` subsets
+it needs, usually a few hundred KB for a page).
 
-> `og-image` 插件目前是关的：它要下载 Google 字体来画社交卡片，自托管字体取不到。
-> 需要社交卡片时，把 `theme.typography` 临时换成一个 Google 字体并重新打开该插件。
+> The `og-image` plugin is disabled: it downloads Google fonts to draw social cards, which is
+> impossible with a self-hosted font. To restore social cards, switch `theme.typography` to a
+> Google font and re-enable the plugin.
 
-## 写插件
+## Writing plugins
 
-三种来源，写在 `plugins:` 列表里：
+Three sources, all listed under `plugins:`:
 
 ```yaml
 plugins:
-  # 1. npm 包（Quartz 官方社区插件）
+  # 1. npm package (official Quartz community plugin)
   - source: "@quartz-community/recent-notes"
     enabled: true
 
-  # 2. 任意 Git 仓库
+  # 2. any Git repository
   - source: "github:someuser/quartz-plugin-foo"
 
-  # 3. 本地目录（软链进 .quartz/plugins/，改完直接生效）
+  # 3. local directory (symlinked into .quartz/plugins/, edits take effect immediately)
   - source: ./plugins/reading-time
     enabled: true
     order: 75
 ```
 
-插件类别对应管线的四个阶段：
+Plugin categories map onto the four pipeline stages:
 
-| 类别          | 职责                                   | 关键方法                                            |
-| ------------- | -------------------------------------- | --------------------------------------------------- |
-| `transformer` | 改 Markdown / HTML，或给文档加派生字段 | `textTransform` / `markdownPlugins` / `htmlPlugins` |
-| `filter`      | 决定哪些文档发布                       | `shouldPublish`                                     |
-| `emitter`     | 输出页面之外的文件（RSS、sitemap…）    | `emit`                                              |
-| `pageType`    | 定义某一类页面怎么渲染                 | `match` / `body` / `layout`                         |
-| `component`   | 纯 UI，塞进 layout 插槽                | 组件本身                                            |
+| Category      | Responsibility                              | Key methods                                         |
+| ------------- | ------------------------------------------- | --------------------------------------------------- |
+| `transformer` | Rewrite Markdown / HTML, add derived fields | `textTransform` / `markdownPlugins` / `htmlPlugins` |
+| `filter`      | Decide which documents are published        | `shouldPublish`                                     |
+| `emitter`     | Emit files other than pages (RSS, sitemap)  | `emit`                                              |
+| `pageType`    | Define how a class of pages renders         | `match` / `body` / `layout`                         |
+| `component`   | Pure UI dropped into a layout slot          | the component itself                                |
 
-`plugins/reading-time/` 是一个可直接照抄的最小示例（纯 ESM，没有构建步骤、没有依赖）：
-它统计正文里的中日韩字符数和英文词数，算出预计阅读时间并插到正文最前面。
-复制这个目录改个名字，就能开始写自己的插件。
+`plugins/reading-time/` is a minimal example worth copying (plain ESM, no build step, no
+dependencies): it counts CJK characters and Latin words in the body, derives an estimated
+reading time and prepends it to the article. Copy the directory, rename it, and you have your
+own plugin.
 
-`order` 控制同一类别内的执行顺序，插件之间的依赖靠它保证（有依赖时构建会报错提示）。
+`order` controls execution within a category and is how plugin dependencies are expressed
+(the build fails with a hint when the order contradicts a declared dependency).
 
-插件命令：
+Plugin commands:
 
 ```bash
-npx quartz plugin add github:user/repo   # 安装
-npx quartz plugin install --from-config  # 按配置补齐所有插件
-npx quartz plugin list                   # 查看已安装
+npx quartz plugin add github:user/repo   # install
+npx quartz plugin install --from-config  # install everything the config references
+npx quartz plugin list                   # list installed plugins
 ```
 
-## 「只读」是怎么保证的
+## How read-only is enforced
 
-- 站点是 **静态构建**：`public/` 里只有 HTML/JS/CSS，没有 `/api`，没有会话，没有可 POST 的端点。
-- 插件在构建期拿到的是文档内容 + 文件元数据，管线里没有「写回 content/」这一步。
-- 想让约束变成硬性的，可以在 CI 里做两件事：
-  1. 构建时把 `content/` 只读挂载（Docker `-v $PWD/content:/app/content:ro`）；
-  2. 构建后跑一次 `git diff --exit-code content/`，任何插件偷偷改文档都会让流水线失败。
+- The site is a **static build**: `public/` contains only HTML/JS/CSS, no `/api`, no sessions,
+  no endpoint that accepts a POST.
+- Plugins receive document content plus file metadata at build time; the pipeline has no
+  "write back to content/" step.
+- To make the constraint hard, do two things in CI:
+  1. Mount `content/` read-only during the build (`docker -v $PWD/content:/app/content:ro`);
+  2. Run `git diff --exit-code content/` after the build, so any plugin that mutates documents
+     fails the pipeline.
 
-需要持久化的交互（评论、点赞）不要塞进数据层，用外部服务（例如 giscus，数据存在 GitHub Discussions）
-或者干脆不做——一旦引入可写后端，这条约束就失效了。
+Do not put stateful interactions (comments, likes) into the data layer. Use an external
+service (giscus, for example, stores data in GitHub Discussions) or skip the feature —
+introducing a writable backend invalidates the whole constraint.
 
-## 对 Quartz 内核做的改动
+## Core patches to Quartz
 
-只有两处，升级 Quartz 时注意合并：
+Three places only; merge them carefully when upgrading Quartz:
 
-1. `quartz/plugins/pageTypes/404.ts`：给生成的 404 页面数据加 `unlisted: true`，
-   否则它会出现在「最近更新」列表和搜索结果里。
-2. `quartz.ts`：注册了一个自定义 layout 条件 `index`（只在首页渲染），
-   用于让 `recent-notes` 只出现在首页。内置条件只有 `not-index` / `has-tags` /
-   `has-backlinks` / `has-toc`。
-3. `quartz/util/glob.ts`：`gitignore: false`。`content/` 是生成物且在 `.gitignore` 里，
-   但构建仍要读它；忽略规则统一交给 `quartz.config.yaml` 的 `ignorePatterns`。
+1. `quartz/plugins/pageTypes/404.ts`: mark the generated 404 page as `unlisted: true`,
+   otherwise it shows up in recent posts and in search results.
+2. `quartz.ts`: register a custom layout condition `index` (render on the home page only) so
+   `recent-notes` appears there and nowhere else. The built-in conditions are `not-index`,
+   `has-tags`, `has-backlinks` and `has-toc`.
+3. `quartz/util/glob.ts`: `gitignore: false`. `content/` is generated and listed in
+   `.gitignore`, but the build still has to read it; ignore rules come from `ignorePatterns`
+   in `quartz.config.yaml` instead.
 
-## 部署
+## Deployment
 
-1. 把 `quartz.config.yaml` 里的 `baseUrl` 改成真实域名；
-2. 推到 GitHub 后按 [Hosting 文档](https://quartz.jzhao.xyz/hosting) 接 GitHub Pages / Cloudflare Pages / Vercel；
-3. 构建命令用 `npm run build`（必须经过 org → md 转换），产物目录 `public/`。
+1. Set `baseUrl` in `quartz.config.yaml` to your real domain;
+2. Push to GitHub and follow the [hosting docs](https://quartz.jzhao.xyz/hosting) for GitHub
+   Pages / Cloudflare Pages / Vercel;
+3. Use `npm run build` as the build command (the org -> md conversion is mandatory) and
+   `public/` as the output directory.
 
-上游自带的 `.github/`、`Dockerfile`、`CODE_OF_CONDUCT.md` 和 Quartz 文档副本都已删除，
-它们只对上游仓库有意义；需要 CI 时按上面的构建命令自己加。
+The upstream `.github/`, `Dockerfile`, `CODE_OF_CONDUCT.md` and the Quartz documentation copy
+have been removed: they only make sense in the upstream repository. Add your own CI using the
+build command above when needed.
 
-## 上游
+## Upstream
 
-Quartz 由 [jackyzha0](https://github.com/jackyzha0) 开发，MIT 协议。
-文档见 https://quartz.jzhao.xyz/ ，仓库 https://github.com/jackyzha0/quartz 。
+Quartz is built by [jackyzha0](https://github.com/jackyzha0) and released under the MIT
+license. Documentation: <https://quartz.jzhao.xyz/>. Repository:
+<https://github.com/jackyzha0/quartz>.
