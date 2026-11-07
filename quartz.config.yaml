@@ -22,8 +22,8 @@ configuration:
   # UI locale (date formats, search box copy). zh-CN, zh-TW, en-US, ...
   locale: zh-CN
 
-  # TODO: your real domain without https://; used for RSS, sitemap and canonical URLs
-  baseUrl: blog.example.com
+  # Used for RSS, sitemap and canonical URLs; no protocol, no trailing slash
+  baseUrl: wallyhao.github.io
 
   # These directories and files are never published
   ignorePatterns:
@@ -193,8 +193,9 @@ plugins:
   - source: "@quartz-community/og-image"
     enabled: false
 
+  # Disabled: it would write a CNAME file holding the default *.github.io domain
   - source: "@quartz-community/cname"
-    enabled: true
+    enabled: false
 
   # --- pageTypes: decide how a class of pages renders -----------------------
   - source: "@quartz-community/canvas-page"
