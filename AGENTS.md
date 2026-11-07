@@ -134,7 +134,7 @@ org/                    文章源文件（org-lite）
 content/                org → md 的生成物，禁止手改
 scripts/org-to-md.mjs   转换器
 vendor/org-lite/        org-lite 解析器副本（上游 dist）
-plugins/                本地 Quartz 插件（例：reading-time）
+plugins/                本地 Quartz 插件（reading-time、default-theme）
 docs/org/               org-lite 语法文档拷贝
 docs/                   Quartz 自带文档，不参与本站构建
 quartz/                 Quartz 内核
@@ -151,6 +151,8 @@ quartz.ts               TS 覆写层（自定义 layout 条件）
 - ❌ 不要把 `content/` 加回 git，也不要在 `quartz.util/glob` 里恢复 `gitignore: true`
   （见下面「内核改动」）。
 - ❌ 不要引入需要写回数据层的功能（评论、收藏等）；要持久化就用外部服务。
+- ❌ 不要删 `plugins/default-theme/`：它在 `<head>` 里把首次访问的主题钉成亮色，
+  删了会退回「跟随系统深色偏好」。要改默认值就改它的 `options.theme`。
 
 ## 对 Quartz 内核的改动
 

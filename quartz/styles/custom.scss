@@ -142,8 +142,20 @@ article h2 {
 
 blockquote {
   border-left: 2px solid var(--tertiary);
+  margin: 1.6rem 0;
+  // 只留左侧内边距：主题给引用块加了上下 padding，段落又带 1em 外边距，
+  // 两者叠加会让左边那条竖线明显长于文字（暗色下尤其明显）。
+  padding: 0 0 0 1.1rem;
   font-style: normal;
   color: var(--darkgray);
+}
+
+blockquote > :first-child {
+  margin-top: 0;
+}
+
+blockquote > :last-child {
+  margin-bottom: 0;
 }
 
 hr {

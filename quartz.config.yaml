@@ -72,6 +72,11 @@ configuration:
 # ---------------------------------------------------------------------------
 plugins:
   # --- transformers: 逐篇文档的 Markdown/HTML 变换 ---------------------------
+  # 首次访问固定为亮色主题，不跟随系统的深色偏好
+  - source: ./plugins/default-theme
+    enabled: true
+    order: 1
+
   - source: "@quartz-community/created-modified-date"
     enabled: true
     options:

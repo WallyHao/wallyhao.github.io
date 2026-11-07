@@ -142,11 +142,12 @@ public/             构建产物（已 gitignore）
 
 三层叠起来：
 
-| 层   | 文件                                                                  | 作用                                                              |
-| ---- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| 结构 | `@quartz-themes/core` + `theme: ink-paper`                            | 间距、标题层级、引用块、表格等版式                                |
-| 配色 | `quartz.config.yaml` 的 `theme.colors` + `quartz/styles/custom.scss`  | 墨观 Inkstone 的 **宣纸 Dimmed**（浅色）/ **玄墨 Dimmed**（深色） |
-| 字体 | `quartz/styles/lxgw-wenkai.scss` + `quartz/static/fonts/lxgw-wenkai/` | 霞鹜文楷 Screen，97 个 woff2 子集自托管                           |
+| 层       | 文件                                                                  | 作用                                                              |
+| -------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 结构     | `@quartz-themes/core` + `theme: ink-paper`                            | 间距、标题层级、引用块、表格等版式                                |
+| 配色     | `quartz.config.yaml` 的 `theme.colors` + `quartz/styles/custom.scss`  | 墨观 Inkstone 的 **宣纸 Dimmed**（浅色）/ **玄墨 Dimmed**（深色） |
+| 字体     | `quartz/styles/lxgw-wenkai.scss` + `quartz/static/fonts/lxgw-wenkai/` | 霞鹜文楷 Screen，97 个 woff2 子集自托管                           |
+| 默认主题 | `plugins/default-theme/`                                              | 首次访问固定亮色，不跟随系统深色偏好；用户切换后以自己选择为准    |
 
 `custom.scss` 里的变量覆盖写在 Quartz 的 `@layer quartz-base` **之外**，
 所以无条件压过主题自带的值——想改颜色，只改那里和 `theme.colors` 两处保持一致即可。
