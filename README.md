@@ -2,6 +2,10 @@
 
 一个极简的个人博客，基于 [Quartz v5](https://quartz.jzhao.xyz/)。
 
+> 文章用 [org-lite](https://github.com/WallyHao/org-lite) 语法写在 `org/`，
+> 构建时转成 Markdown 交给 Quartz。**给智能体/贡献者的完整说明见 [AGENTS.md](AGENTS.md)**，
+> 语法文档见 [`docs/org/`](docs/org/)。
+
 设计上只有四条约束，其余都是推论：
 
 1. **数据层只有文档。** `org/` 下全是 org-lite 文档，没有数据库、CMS 和额外的 JSON 数据文件。
@@ -34,7 +38,9 @@ org/                唯一数据源：org-lite 文档
   posts/            文章目录，自动生成 /posts 列表页
 content/            org → md 的生成物（已 gitignore）
 scripts/org-to-md.mjs  转换器
-vendor/org-lite/   org-lite 的构建产物（上游仓库私有，故内置）
+vendor/org-lite/   org-lite 解析器副本（上游 dist）
+docs/org/          org-lite 语法文档拷贝（写作前先看这里）
+AGENTS.md          智能体/贡献者说明
 quartz.config.yaml  站点参数 + 插件装配 + 页面骨架
 quartz.ts           TS 覆写层：函数型配置、自定义 layout 条件
 plugins/            本地插件（示例：reading-time）
