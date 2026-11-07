@@ -1,0 +1,161 @@
+@use "./variables.scss" as *;
+@use "./lxgw-wenkai.scss";
+
+// ---------------------------------------------------------------------------
+// 皮肤：ink-paper 的结构 + 墨观 Inkstone 的色板
+//   浅色 = 宣纸 Dimmed，深色 = 玄墨 Dimmed
+//
+// 这里的规则都在 quartz-base / obsidian-theme 两个 cascade layer 之外，
+// 因此无条件覆盖主题与 Quartz 基础样式里的同名变量。
+// ---------------------------------------------------------------------------
+
+// ---- 字体 ----------------------------------------------------------------
+:root {
+  --bodyFont: "LXGW WenKai Screen", "LXGW WenKai", serif;
+  --headerFont: "LXGW WenKai Screen", "LXGW WenKai", serif;
+  --titleFont: "LXGW WenKai Screen", "LXGW WenKai", serif;
+  --codeFont: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  // Obsidian 主题用的是这组（ink-paper 内部大量 font-family: var(--font-text)）
+  --font-text: "LXGW WenKai Screen", "LXGW WenKai", serif;
+  --font-interface: "LXGW WenKai Screen", "LXGW WenKai", serif;
+  --font-default: "LXGW WenKai Screen", "LXGW WenKai", serif;
+}
+
+// ---- 宣纸 Dimmed（浅色）--------------------------------------------------
+:root {
+  --light: #e9e2d4;
+  --lightgray: #ded4c2;
+  --gray: #847c6e;
+  --darkgray: #4f4a40;
+  --dark: #2f2b25;
+  --secondary: #144a74;
+  --tertiary: #894e54;
+  --highlight: rgba(211, 199, 174, 0.45);
+  --textHighlight: #d3c7aecc;
+
+  // Flexoki 灰阶 → 陈纸
+  --color-base-00: #e9e2d4;
+  --color-base-05: #e9e2d4;
+  --color-base-10: #e3dbcb;
+  --color-base-20: #dcd3c1;
+  --color-base-25: #d5cbb7;
+  --color-base-30: #cec4ae;
+  --color-base-35: #c0b49e;
+  --color-base-40: #ada18a;
+  --color-base-50: #847c6e;
+  --color-base-60: #665f53;
+  --color-base-70: #4f4a40;
+  --color-base-80: #3a352c;
+  --color-base-90: #2f2b25;
+  --color-base-100: #2f2b25;
+
+  // Obsidian 语义色
+  --background-primary: #e9e2d4;
+  --background-primary-alt: #e3dbcb;
+  --background-secondary: #e3dbcb;
+  --background-secondary-alt: #dcd3c1;
+  --background-modifier-border: #ded4c2;
+  --text-normal: #2f2b25;
+  --text-muted: #665f53;
+  --text-faint: #847c6e;
+  --text-accent: #144a74;
+  --text-accent-hover: #894e54;
+  --interactive-accent: #144a74;
+  --interactive-accent-hover: #894e54;
+}
+
+// ---- 玄墨 Dimmed（深色）--------------------------------------------------
+:root[saved-theme="dark"] {
+  --light: #19181e;
+  --lightgray: #2a2832;
+  --gray: #8f8996;
+  --darkgray: #b0a99f;
+  --dark: #d8d2c6;
+  --secondary: #66a9c9;
+  --tertiary: #c57f73;
+  --highlight: rgba(54, 51, 71, 0.55);
+  --textHighlight: #c57f7344;
+
+  --color-base-00: #19181e;
+  --color-base-05: #19181e;
+  --color-base-10: #1e1d24;
+  --color-base-20: #24222b;
+  --color-base-25: #2b2933;
+  --color-base-30: #393643;
+  --color-base-35: #4f4a5b;
+  --color-base-40: #6e6875;
+  --color-base-50: #8f8996;
+  --color-base-60: #b0a99f;
+  --color-base-70: #c4bdb2;
+  --color-base-80: #d8d2c6;
+  --color-base-90: #e5e0d6;
+  --color-base-100: #d8d2c6;
+
+  --background-primary: #19181e;
+  --background-primary-alt: #1e1d24;
+  --background-secondary: #1e1d24;
+  --background-secondary-alt: #24222b;
+  --background-modifier-border: #2a2832;
+  --text-normal: #d8d2c6;
+  --text-muted: #b0a99f;
+  --text-faint: #8f8996;
+  --text-accent: #66a9c9;
+  --text-accent-hover: #c57f73;
+  --interactive-accent: #66a9c9;
+  --interactive-accent-hover: #c57f73;
+}
+
+// ---- 排版微调 ------------------------------------------------------------
+.center > article,
+.center .page-header {
+  max-width: 40rem;
+  margin-inline: auto;
+}
+
+article p {
+  line-height: 1.9;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+.page-header {
+  border-bottom: 1px solid var(--lightgray);
+  padding-bottom: 1.1rem;
+  margin-bottom: 2.2rem;
+}
+
+h1.article-title {
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+article h2 {
+  margin-top: 2.6rem;
+  letter-spacing: 0.03em;
+}
+
+blockquote {
+  border-left: 2px solid var(--tertiary);
+  font-style: normal;
+  color: var(--darkgray);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--lightgray);
+}
+
+// 阅读时间（本地插件 reading-time 的输出）
+.reading-time {
+  margin: 0 0 1.5rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: var(--gray);
+}
+
+// 文楷没有真正的粗体，避免浏览器做难看的伪粗
+strong,
+b {
+  font-weight: 600;
+}

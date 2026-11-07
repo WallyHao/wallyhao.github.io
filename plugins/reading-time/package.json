@@ -1,0 +1,24 @@
+{
+  "name": "quartz-plugin-reading-time",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "从文档正文提炼预计阅读时间，并渲染在文章开头",
+  "exports": {
+    ".": "./index.js"
+  },
+  "quartz": {
+    "name": "reading-time",
+    "displayName": "Reading Time",
+    "description": "从文档正文提炼预计阅读时间，并渲染在文章开头",
+    "category": "transformer",
+    "quartzVersion": "^5.0.0",
+    "defaultOrder": 75,
+    "defaultEnabled": true,
+    "defaultOptions": {
+      "cjkPerMinute": 300,
+      "wordsPerMinute": 200,
+      "minChars": 300
+    }
+  }
+}

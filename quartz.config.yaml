@@ -1,0 +1,391 @@
+# yaml-language-server: $schema=./quartz/plugins/quartz-plugins.schema.json
+#
+# Quartz v5 站点配置。
+# 这里只有「站点级参数」和「插件装配」两类东西，没有任何内容数据。
+# 内容数据永远只存在于 content/ 目录下的 Markdown 文件里。
+#
+# TODO(wallyhao): 把 pageTitle / baseUrl / footer 链接换成自己的。
+
+configuration:
+  # 站点标题，显示在左上角和页面 <title> 里
+  pageTitle: Wally
+  pageTitleSuffix: ""
+
+  # 站内跳转不整页刷新（客户端路由）
+  enableSPA: true
+  # 鼠标悬停内链时弹出预览卡片
+  enablePopovers: true
+
+  # 不接入任何统计服务；要加统计改成 { provider: plausible } 等
+  analytics: null
+
+  # 界面语言（日期格式、搜索框文案等），可选 zh-CN / zh-TW / en-US ...
+  locale: zh-CN
+
+  # TODO: 换成你的真实域名，不要带 https://，用于 RSS / sitemap / canonical URL
+  baseUrl: blog.example.com
+
+  # 这些目录/文件不会被发布
+  ignorePatterns:
+    - private
+    - drafts
+    - templates
+    - .obsidian
+
+  theme:
+    # 字体自托管在 quartz/static/fonts/lxgw-wenkai/，不走 Google Fonts
+    fontOrigin: local
+    cdnCaching: false
+    typography:
+      header: LXGW WenKai Screen
+      body: LXGW WenKai Screen
+      code: IBM Plex Mono
+    # 墨观 Inkstone 色板：浅色 = 宣纸 Dimmed，深色 = 玄墨 Dimmed
+    colors:
+      lightMode:
+        light: "#e9e2d4"
+        lightgray: "#ded4c2"
+        gray: "#847c6e"
+        darkgray: "#4f4a40"
+        dark: "#2f2b25"
+        secondary: "#144a74"
+        tertiary: "#894e54"
+        highlight: rgba(211, 199, 174, 0.45)
+        textHighlight: "#d3c7aecc"
+      darkMode:
+        light: "#19181e"
+        lightgray: "#2a2832"
+        gray: "#8f8996"
+        darkgray: "#b0a99f"
+        dark: "#d8d2c6"
+        secondary: "#66a9c9"
+        tertiary: "#c57f73"
+        highlight: rgba(54, 51, 71, 0.55)
+        textHighlight: "#c57f7344"
+
+# ---------------------------------------------------------------------------
+# 插件管线：transformers → filters → emitters → pageTypes
+# 每个条目就是一次「装配」，不代表数据。
+#   source: npm 包名 / github:user/repo / ./本地目录
+#   order:  同一类别内的执行顺序，依赖关系靠它保证
+#   layout: 仅纯组件插件需要，声明它出现在页面骨架的哪个插槽
+# ---------------------------------------------------------------------------
+plugins:
+  # --- transformers: 逐篇文档的 Markdown/HTML 变换 ---------------------------
+  - source: "@quartz-community/created-modified-date"
+    enabled: true
+    options:
+      defaultDateType: created
+      priority:
+        - frontmatter
+        - git
+        - filesystem
+    order: 10
+
+  - source: "@quartz-community/syntax-highlighting"
+    enabled: true
+    options:
+      theme:
+        light: rose-pine-dawn
+        dark: rose-pine-moon
+      keepBackground: false
+    order: 20
+
+  - source: "@quartz-community/obsidian-flavored-markdown"
+    enabled: true
+    options:
+      enableInHtmlEmbed: false
+      enableCheckbox: true
+    order: 30
+
+  - source: "@quartz-community/github-flavored-markdown"
+    enabled: true
+    order: 40
+
+  - source: "@quartz-community/table-of-contents"
+    enabled: true
+    order: 50
+    layout:
+      position: right
+      priority: 30
+
+  - source: "@quartz-community/crawl-links"
+    enabled: true
+    options:
+      markdownLinkResolution: shortest
+    order: 60
+
+  - source: "@quartz-community/description"
+    enabled: true
+    order: 70
+
+  - source: "@quartz-community/latex"
+    enabled: true
+    options:
+      renderEngine: katex
+    order: 80
+
+  - source: "@quartz-community/citations"
+    enabled: false
+    order: 85
+
+  - source: "@quartz-community/hard-line-breaks"
+    enabled: false
+    order: 90
+
+  - source: "@quartz-community/ox-hugo"
+    enabled: false
+    order: 91
+
+  - source: "@quartz-community/roam"
+    enabled: false
+    order: 92
+
+  # 自定义本地插件示例：从文档正文提炼「预计阅读时间」并渲染到文章开头
+  - source: ./plugins/reading-time
+    enabled: true
+    order: 75
+
+  # --- 前端资源 / 字体 ------------------------------------------------------
+  - source: "@quartz-community/quartz-fonts"
+    enabled: true
+
+  # 结构/排版来自 ink-paper，配色与字体由 quartz/styles/custom.scss 覆盖
+  - source: "@quartz-themes/core"
+    enabled: true
+    options:
+      theme: "ink-paper"
+      mode: both
+      themeFonts: false
+
+  # --- filters: 决定哪些文档最终被发布 --------------------------------------
+  - source: "@quartz-community/remove-draft"
+    enabled: true
+
+  - source: "@quartz-community/explicit-publish"
+    enabled: false
+
+  # --- emitters: 生成 HTML 之外的产物 --------------------------------------
+  - source: "@quartz-community/alias-redirects"
+    enabled: true
+
+  - source: "@quartz-community/content-index"
+    enabled: true
+    options:
+      enableSiteMap: true
+      enableRSS: true
+
+  - source: "@quartz-community/favicon"
+    enabled: true
+
+  # OG 图依赖 Google Fonts 下载字体；本站用自托管的霞鹜文楷，取不到字体，
+  # 先关掉。想恢复社交卡片就换回 Google 字体再打开。
+  - source: "@quartz-community/og-image"
+    enabled: false
+
+  - source: "@quartz-community/cname"
+    enabled: true
+
+  # --- pageTypes: 决定某一类页面怎么渲染 ------------------------------------
+  - source: "@quartz-community/canvas-page"
+    enabled: false
+
+  - source: "@quartz-community/content-page"
+    enabled: true
+
+  - source: "@quartz-community/folder-page"
+    enabled: true
+
+  - source: "@quartz-community/tag-page"
+    enabled: true
+
+  # --- 纯组件插件：只负责往页面骨架里塞一块 UI ------------------------------
+  - source: "@quartz-community/explorer"
+    enabled: false
+    layout:
+      position: left
+      priority: 50
+
+  - source: "@quartz-community/graph"
+    enabled: false
+    layout:
+      position: right
+      priority: 10
+
+  - source: "@quartz-community/search"
+    enabled: true
+    layout:
+      position: left
+      priority: 20
+      group: toolbar
+      groupOptions:
+        grow: true
+
+  - source: "@quartz-community/backlinks"
+    enabled: false
+    layout:
+      position: right
+      priority: 50
+
+  - source: "@quartz-community/article-title"
+    enabled: true
+    layout:
+      position: beforeBody
+      priority: 10
+
+  - source: "@quartz-community/content-meta"
+    enabled: true
+    options:
+      # 阅读时间交给本地插件算（对中文更准），这里只留日期
+      showReadingTime: false
+    layout:
+      position: beforeBody
+      priority: 20
+      # 首页不显示日期（首页没有「文章时间」这个概念）
+      condition: not-index
+
+  - source: "@quartz-community/tag-list"
+    enabled: true
+    layout:
+      position: beforeBody
+      priority: 30
+
+  - source: "@quartz-community/page-title"
+    enabled: true
+    layout:
+      position: left
+      priority: 10
+
+  - source: "@quartz-community/darkmode"
+    enabled: true
+    layout:
+      position: left
+      priority: 30
+      group: toolbar
+
+  - source: "@quartz-community/reader-mode"
+    enabled: true
+    layout:
+      position: left
+      priority: 35
+      group: toolbar
+
+  - source: "@quartz-community/breadcrumbs"
+    enabled: false
+    layout:
+      position: beforeBody
+      priority: 5
+      condition: not-index
+
+  - source: "@quartz-community/comments"
+    enabled: false
+    options:
+      provider: giscus
+      options: {}
+    layout:
+      position: afterBody
+      priority: 10
+
+  - source: "@quartz-community/footer"
+    enabled: true
+    options:
+      # TODO: 换成你自己的链接，留空则不显示
+      links: {}
+    layout:
+      position: footer
+      priority: 50
+
+  # 首页/文件夹页的「最近更新」列表
+  - source: "@quartz-community/recent-notes"
+    enabled: true
+    options:
+      title: 最近更新
+      limit: 5
+      showTags: true
+      linkToMore: posts
+      hideTagPages: true
+      hideFolderPages: true
+    layout:
+      position: afterBody
+      priority: 50
+      # index 条件在 quartz.ts 里注册
+      condition: index
+
+  - source: "@quartz-community/spacer"
+    enabled: true
+    options: {}
+    order: 25
+    layout:
+      position: left
+      priority: 25
+      display: mobile-only
+
+  - source: "@quartz-community/bases-page"
+    enabled: false
+    options: {}
+    order: 50
+
+  # 必装：负责解析 frontmatter。这里关掉属性面板，只保留解析能力。
+  - source: "@quartz-community/note-properties"
+    enabled: true
+    options:
+      includeAll: false
+      includedProperties:
+        - description
+        - tags
+        - aliases
+      excludedProperties: []
+      hidePropertiesView: true
+      delimiters: ---
+      language: yaml
+    order: 5
+
+  - source: "@quartz-community/unlisted-pages"
+    enabled: true
+    options: {}
+    order: 45
+
+  - source: "@quartz-community/encrypted-pages"
+    enabled: false
+    options:
+      iterations: 600000
+      passwordField: password
+      unlistWhenEncrypted: false
+      outputPath: static/encryptedContentIndex.json
+    order: 900
+
+  - source: "@quartz-community/stacked-pages"
+    enabled: false
+    layout:
+      position: afterBody
+      priority: 50
+      display: all
+
+# ---------------------------------------------------------------------------
+# 页面骨架：决定每个插槽里放什么、顺序如何
+# ---------------------------------------------------------------------------
+layout:
+  groups:
+    toolbar:
+      priority: 35
+      direction: row
+      gap: 0.5rem
+  byPageType:
+    "404":
+      positions:
+        beforeBody: []
+        left: []
+        right: []
+    content: {}
+    folder:
+      exclude:
+        - reader-mode
+      positions:
+        right: []
+    tag:
+      exclude:
+        - reader-mode
+      positions:
+        right: []
+    canvas: {}
+    bases: {}
