@@ -2,27 +2,27 @@
 @use "./lxgw-wenkai.scss";
 
 // ---------------------------------------------------------------------------
-// 皮肤：ink-paper 的结构 + 墨观 Inkstone 的色板
-//   浅色 = 宣纸 Dimmed，深色 = 玄墨 Dimmed
+// Skin: ink-paper structure + the Inkstone palette.
+//   light = Xuanzhi Dimmed, dark = Xuanmo Dimmed
 //
-// 这里的规则都在 quartz-base / obsidian-theme 两个 cascade layer 之外，
-// 因此无条件覆盖主题与 Quartz 基础样式里的同名变量。
+// These rules sit outside the quartz-base / obsidian-theme cascade layers,
+// so they override the theme and Quartz base variables unconditionally.
 // ---------------------------------------------------------------------------
 
-// ---- 字体 ----------------------------------------------------------------
+// ---- Fonts ---------------------------------------------------------------
 :root {
   --bodyFont: "LXGW WenKai Screen", "LXGW WenKai", serif;
   --headerFont: "LXGW WenKai Screen", "LXGW WenKai", serif;
   --titleFont: "LXGW WenKai Screen", "LXGW WenKai", serif;
   --codeFont: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  // Obsidian 主题用的是这组（ink-paper 内部大量 font-family: var(--font-text)）
+  // The Obsidian theme uses these names (ink-paper relies on var(--font-text) a lot)
   --font-text: "LXGW WenKai Screen", "LXGW WenKai", serif;
   --font-interface: "LXGW WenKai Screen", "LXGW WenKai", serif;
   --font-default: "LXGW WenKai Screen", "LXGW WenKai", serif;
 }
 
-// ---- 宣纸 Dimmed（浅色）--------------------------------------------------
+// ---- Xuanzhi Dimmed (light) ----------------------------------------------
 :root {
   --light: #e9e2d4;
   --lightgray: #ded4c2;
@@ -34,7 +34,7 @@
   --highlight: rgba(211, 199, 174, 0.45);
   --textHighlight: #d3c7aecc;
 
-  // Flexoki 灰阶 → 陈纸
+  // Flexoki grey ramp -> aged paper
   --color-base-00: #e9e2d4;
   --color-base-05: #e9e2d4;
   --color-base-10: #e3dbcb;
@@ -50,7 +50,7 @@
   --color-base-90: #2f2b25;
   --color-base-100: #2f2b25;
 
-  // Obsidian 语义色
+  // Obsidian semantic colors
   --background-primary: #e9e2d4;
   --background-primary-alt: #e3dbcb;
   --background-secondary: #e3dbcb;
@@ -64,12 +64,13 @@
   --interactive-accent: #144a74;
   --interactive-accent-hover: #894e54;
 
-  // ink-paper 用 mask-image 画工具按钮图标，颜料来自这个变量；
-  // 它的浅色块里这个值算出来是空的，导致图标透明不可见，这里显式钉死。
+  // ink-paper paints the toolbar icons with mask-image and uses this variable
+  // as the paint. In its light block the value resolves to nothing, leaving the
+  // icons invisible, so pin it explicitly.
   --quartz-icon-color: #4f4a40;
 }
 
-// ---- 玄墨 Dimmed（深色）--------------------------------------------------
+// ---- Xuanmo Dimmed (dark) ------------------------------------------------
 :root[saved-theme="dark"] {
   --light: #19181e;
   --lightgray: #2a2832;
@@ -111,7 +112,7 @@
   --quartz-icon-color: #b0a99f;
 }
 
-// ---- 排版微调 ------------------------------------------------------------
+// ---- Typography tweaks ---------------------------------------------------
 .center > article,
 .center .page-header {
   max-width: 40rem;
@@ -143,8 +144,9 @@ article h2 {
 blockquote {
   border-left: 2px solid var(--tertiary);
   margin: 1.6rem 0;
-  // 只留左侧内边距：主题给引用块加了上下 padding，段落又带 1em 外边距，
-  // 两者叠加会让左边那条竖线明显长于文字（暗色下尤其明显）。
+  // Left padding only: the theme adds vertical padding to quotes and paragraphs
+  // keep their 1em margins, which together made the left rule much taller than
+  // the text (most visible in dark mode).
   padding: 0 0 0 1.1rem;
   font-style: normal;
   color: var(--darkgray);
@@ -163,7 +165,7 @@ hr {
   border-top: 1px solid var(--lightgray);
 }
 
-// 阅读时间（本地插件 reading-time 的输出）
+// Reading time, emitted by the local reading-time plugin
 .reading-time {
   margin: 0 0 1.5rem;
   font-size: 0.85rem;
@@ -171,7 +173,7 @@ hr {
   color: var(--gray);
 }
 
-// 文楷没有真正的粗体，避免浏览器做难看的伪粗
+// WenKai has no real bold weight; keep the synthetic weight subtle
 strong,
 b {
   font-weight: 600;

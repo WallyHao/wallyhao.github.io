@@ -1,19 +1,20 @@
 /**
- * 本地插件示例：预计阅读时间。
+ * Local plugin example: estimated reading time.
  *
- * 这是 Quartz v5 的「本地插件」形态：
- *   - 在 quartz.config.yaml 里用相对路径引用（source: ./plugins/reading-time）
- *   - 构建时被软链到 .quartz/plugins/ 再动态 import，不需要单独打包
- *   - 只读取文档内容，不写回 content/ 里的任何文件
+ * This is what a Quartz v5 local plugin looks like:
+ *   - referenced by relative path in quartz.config.yaml (source: ./plugins/reading-time)
+ *   - symlinked into .quartz/plugins/ at build time and imported dynamically,
+ *     no separate build step required
+ *   - reads document content only, never writes into content/
  *
- * 插件契约（transformer）：
+ * Transformer contract:
  *   { name, textTransform?, markdownPlugins?, htmlPlugins?, externalResources? }
- * 这里用 htmlPlugins 在 HAST 上操作，把结果插到正文最前面。
+ * This plugin uses htmlPlugins to prepend a paragraph to the HAST tree.
  */
 
 const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/g
 
-/** 递归收集 HAST 里的纯文本（跳过代码块与行内代码的额外噪音） */
+/** Recursively collect plain text from the HAST tree (skipping script/style noise) */
 function collectText(node) {
   if (!node) return ""
   if (node.type === "text") return node.value ?? ""
@@ -49,7 +50,7 @@ export default function ReadingTime(opts = {}) {
           const text = collectText(tree)
           const { minutes, totalChars } = countReading(text, cjkPerMinute, wordsPerMinute)
 
-          // 太短的页面（首页、列表页、标签页）不显示
+          // Skip short pages (home page, folder and tag listings)
           if (totalChars < minChars) return
 
           const label = `预计阅读 ${Math.max(1, Math.round(minutes))} 分钟`

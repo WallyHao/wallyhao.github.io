@@ -23,7 +23,7 @@ export const NotFoundPageType: QuartzPageTypePlugin = () => ({
       {
         slug,
         title: notFound,
-        // 生成的 404 页不应出现在「最近更新」/ 搜索等列表里
+        // The generated 404 page must not show up in listings or search
         data: { ...vfile.data, unlisted: true },
       },
     ]

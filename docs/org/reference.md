@@ -1,266 +1,232 @@
-# org-lite 语法参考 v0.1
+# org-lite Syntax Reference v0.1
 
-本文定义 org-lite 的精确语法和错误恢复规则。入门说明见[语法指南](syntax.md)，正反例见[规范示例](examples.md)，解析结果与接口见[数据模型与解析接口](model.md)。
+This document specifies the org-lite syntax, recovery rules, and compatibility boundaries. For an introduction, see the [syntax guide](syntax.md); for executable examples, see [conformance examples](examples.md); for result types and interfaces, see the [document model](model.md).
 
-## 正式规则
+## Formal rules
 
-### R0. 字符、空白与比较
+### R0. Characters, whitespace, and comparison
 
-- 文档使用 Unicode 文本；文件交换编码为 UTF-8。接受 LF 和 CRLF，最后一行可以没有换行符。输入解码失败属于文件读取错误，不得静默丢弃字节。
-- 语法中的“空格”指 ASCII 空格 U+0020；“水平空白”指空格或制表符 U+0009。除非另有说明，要求分隔处至少有一个水平空白。只含水平空白的行及空行都是空白行。
-- 行内边界中的“空白”按 Unicode `White_Space` 判断，与结构要求的“水平空白”不同。“物理行”指源文的一行；“逻辑行”指移除当前列表等容器缩进后的行。标题和脚注定义明确要求物理行第 0 列，不因去缩进而新增。
-- 全角空格、不换行空格和零宽字符不得替代结构标记要求的水平空白。零宽字符不得被自动删除。
-- 缩进按列计数：空格前进一列，制表符前进到下一个 8 的倍数列；列从 0 开始。列表层级不要求固定两个或四个空格。
-- `#+` 关键字、块类型、属性键、`PROPERTIES`、`END` 和链接协议名只对 ASCII 字母忽略大小写。复选框、实体名、LaTeX 命令及环境名、脚注标签、属性值和链接目标区分大小写。
-- “标识值”指一个或多个 Unicode 字母、十进制数字及 `_`、`-`、`.`、`:`，不得含空白。用于 `ID`、`CUSTOM_ID` 和脚注标签；脚注标签进一步不得含 `:`。不强制 UUID 格式。
-- “名称比较”用于标题、显式锚点、`NAME` 及文本搜索：去掉首尾水平空白，将中间连续水平空白压成一个 ASCII 空格，保留其他字符；区分大小写，不做 Unicode 规范化。标题比较使用标记原文，不剥离行内格式。
-- 解析必须保留原始文本，包括标记、缩进、换行类型、尾随空白、重复字段及无法识别的内容。后文的解码、去缩进和取值只产生解释后的值，不得自动改写源文件。
+- Documents contain Unicode text and use UTF-8 for exchange. LF and CRLF are accepted, and the last line need not end in a newline. Invalid UTF-8 is an input error; bytes must not be silently discarded.
+- A space is U+0020; horizontal whitespace is a space or U+0009 tab. Unless otherwise stated, a required separator has at least one horizontal whitespace character. Empty lines and lines containing only horizontal whitespace are blank.
+- Inline whitespace uses Unicode `White_Space`, distinct from structural horizontal whitespace. A physical line is a source line; a logical line has its enclosing container indentation removed. Headings and footnote definitions must start in physical column 0.
+- Full-width spaces, nonbreaking spaces, and zero-width characters do not replace required horizontal whitespace; zero-width characters are not silently removed. Indentation uses zero-based columns, spaces advance one column, and tabs advance to the next multiple of eight.
+- `#+` keywords, block types, property keys, `PROPERTIES`, `END`, and link protocols ignore ASCII case. Checkbox characters, entity names, LaTeX commands and environments, footnote labels, property values, and link targets are case-sensitive.
+- An identifier consists of one or more Unicode letters, decimal digits, `_`, `-`, `.`, or `:`, with no whitespace. `ID`, `CUSTOM_ID`, and footnote labels use identifiers; footnote labels cannot contain `:`. UUIDs are not required.
+- For name comparisons of headings, explicit targets, `NAME`, and text searches, trim horizontal whitespace and collapse internal runs of it to one ASCII space. Comparison is case-sensitive, with no Unicode normalization. Heading comparison uses the original markup in the title.
+- Parsing preserves the original text, including delimiters, indentation, newline types, trailing whitespace, duplicates, and unrecognized content. Decoding and dedenting produce interpreted values without rewriting the source.
 
-### R1. 结构、识别顺序与行内上下文
+### R1. Structure, precedence, and inline contexts
 
-1. 文档由首个标题前的内容及标题树组成；空文档有效。
-2. 标题必须从物理行第 0 列开始，由一个或多个 `*`、水平空白、可为空的标题文字组成。星号数是层级，不设语法上限。跳级有效，例如一级后直接出现三级；父节点是此前最近的较低级标题，不补造二级标题。
-3. 标题的正文到下一个标题之前结束；标题的整个子树到下一个层级小于或等于自己的标题之前结束。`TODO`、`COMMENT`、`[#A]`、进度和末尾标签均为标题文字。
-4. 在可解析结构的上下文中，连续的非空白普通行组成段落。空白行或新的合法结构结束当前段落；新结构不要求前面有空白行。普通换行是段内软换行，不产生强制换行节点。行末 `\\` 只是文字。
-5. 水平分隔线是在去掉当前容器缩进及前导水平空白后，仅含至少五个连续 `-` 及可选尾随水平空白的一行；`----` 和 `----- text` 均为普通段落内容。
-6. 先识别已闭合的原样区域，再解释内部行：代码、示例、注释、独立公式和 LaTeX 环境中的标题样式文字不会建立标题。其他上下文中的第 0 列标题结束当前列表、引用或脚注定义。
-7. 在允许的位置按以下顺序识别行结构：标题；标题紧接的属性抽屉；内容块或 LaTeX 环境、独立公式；脚注定义；`TITLE` 或附属关键字；注释行；表格；分隔线；列表；段落。已进入列表等容器时，先按容器规则确定范围，再解析内部结构。
-8. 未知 `#+` 行独立保留为文本行，不并入前后段落，不作为 `# ` 注释。孤立的结束标记同样处理。
+1. A document consists of content before the first heading and a heading tree; an empty document is valid.
+2. A heading starts at physical column 0 with one or more `*`, horizontal whitespace, and an optional title. Its level is the number of asterisks; there is no syntax limit. Skipped levels are valid and the parent is the nearest preceding heading of lower level; missing levels are not invented.
+3. A heading's body ends at the next heading. Its subtree ends before the next heading of equal or lower level, or at EOF. `TODO`, `COMMENT`, `[#A]`, progress indicators, and trailing tags remain title text.
+4. Consecutive ordinary nonblank lines form a paragraph. A blank line or valid new structure ends it, without requiring a preceding blank line. Ordinary newlines are soft breaks; trailing `\\` is literal text.
+5. After removing container indentation and leading horizontal whitespace, a horizontal rule contains at least five consecutive `-` and optional trailing horizontal whitespace only. `----` and `----- text` are paragraph text.
+6. Closed literal regions are recognized before their contents: heading-like lines inside source, example, comment, standalone formula, or LaTeX environment regions do not create headings. Elsewhere a column-zero heading ends the current list, quote, or footnote definition.
+7. Where allowed, line structures are recognized in this order: heading; immediately attached property drawer; block, LaTeX environment, or standalone formula; footnote definition; TITLE or affiliated keyword; comment line; table; horizontal rule; list; paragraph. A container's boundaries are determined before its interior is parsed.
+8. Unknown `#+` lines and orphan closing markers are separate raw lines, not comments or parts of adjacent paragraphs.
 
-行内解析从左到右进行。在同一位置有歧义时，依次尝试：行内代码或原样文本、公式或 LaTeX 命令、完整方括号链接、完整脚注引用、显式锚点、命名实体、文字强调、上下标、普通文字。候选规则必须完整成功才消耗输入；失败后的处理见 E2。`\NAME` 在实体和 LaTeX 命令之间的具体优先级见 R4。
+Inline parsing proceeds left to right. At an ambiguous position the order is inline code or verbatim, formula or LaTeX command, complete bracket link, complete footnote reference, explicit target, named entity, emphasis, script, then text. A candidate consumes input only when it succeeds; see E2 for recovery.
 
-| 上下文 | 允许解释的内容 |
+| Context | Allowed interpretation |
 | --- | --- |
-| 正文、列表项、引用内段落、表格普通单元格、脚注正文、标题 | 全部保留的行内语法；独立公式和环境仍须满足各自的行规则 |
-| `TITLE`、`CAPTION` | 全部保留的行内语法，但不定义锚点，也不建立嵌套行结构 |
-| 链接显示文字、带括号的上下标内容 | 文字格式、上下标、实体及行内 LaTeX；不含链接、锚点、脚注或独立公式 |
-| 链接目标、锚点名称、`NAME`、属性值、脚注标签、代码语言名 | 原样取值，不递归解释行内语法 |
-| 代码、示例、注释、公式及 LaTeX 内容 | 内部不解释 Org 语法；仅适用本类型的结束或转义规则 |
+| Body, list items, quote paragraphs, ordinary table cells, footnotes, headings | All supported inline syntax; standalone formulas and environments still follow their line rules |
+| `TITLE`, `CAPTION` | Supported inline syntax, but no target definitions or nested line structures |
+| Link descriptions and bracketed script contents | Formatting, scripts, entities, and inline LaTeX; no links, targets, footnotes, or standalone formulas |
+| Link targets, target names, `NAME`, property values, footnote labels, code language | Literal values, with no recursive inline parsing |
+| Source, example, comment, formula, and LaTeX contents | No nested Org parsing; only the corresponding delimiter and escape rules apply |
 
-### R2. 列表与复选框
+### R2. Lists and checkboxes
 
-- 无序项为行首缩进后 `-` 加水平空白；有序项为一个或多个 ASCII 数字、`.`、水平空白。数字可为 0、有前导零或不连续；保留其原始数字，不据此推断层级或重置计数。`+ `、缩进的 `* `、`1) `、`a. ` 均不是列表项。
-- 列表项第一行可以没有正文。标记左边缘的列记为 B，标记和其后全部水平空白之后的位置记为 C。复选框不计入标记宽度。例如 `10. [ ] 任务` 的 B 为 0，C 为 4。
-- 列表项第一行在可选复选框之后按段落行内内容解释；块、表格等项内行结构必须从后续缩进行开始，不从列表第一行的正文中建立。
-- 同一列表的同级项必须有相同 B 和相同类型。相同 B 处类型改变时，结束前一列表、建立相邻的新列表，不自动转换项目。
-- 后续非空白行缩进达到 C 时属于当前项；若它是新列表标记，则建立子列表。续行可以是段落、表格、引用或代码等保留结构。进入该项时只移除 C 列容器缩进，再解释内容；多出的缩进继续保留。
-- 缩进小于 C 的行结束当前项，再按外层容器规则重新处理。它可以成为同级项、祖先项的内容或列表外段落；不得凭空补造父项。第 0 列标题始终按 R1 处理。
-- 一个空白行允许分隔项内段落，也允许分隔同级项；后面若不能继续该列表，空白行之后的内容在外层处理。两个连续空白行结束当前上下文中的全部列表层级。已闭合原样块里的空白行不参与该计数。
-- 复选框仅在列表标记及其分隔空白后、第一行正文的开头识别，精确取 `[ ]`、`[X]`、`[-]` 三种。其后必须是水平空白或行尾。`[x]`、`[x ]`、正文中间的 `[ ]` 均为文字。
-- 复选框分别记录未完成、完成、部分完成状态。仅解析文件时不得根据子项重算状态。描述列表的 `::` 和计数器 `[@5]` 均为普通项内文字；`1. [@5] [ ] 任务` 中的 `[ ]` 不在正文开头，因而也不构成复选框。
-- 从带制表符的行移除 C 列容器缩进时，若边界落在制表符内部，其余列在解释后的值中转为空格；原文中的制表符保留。
+- An unordered item is indentation followed by `-` and horizontal whitespace. An ordered item uses one or more ASCII digits, `.`, and horizontal whitespace. Zero, leading zeroes, and nonconsecutive numbers are allowed and preserved. `+ `, indented `* `, `1) `, and `a. ` are not list markers.
+- The first line may have no body. Let B be the marker's left column and C the position after the marker and all following horizontal whitespace; the checkbox is not part of the marker. In `10. [ ] Task`, B=0 and C=4.
+- The first-line body after an optional checkbox is inline paragraph content. Nested blocks and tables start on later indented lines.
+- Siblings in one list have the same B and list type. A change of type at B closes the old list and starts an adjacent list.
+- Later nonblank lines indented to C belong to the item. A list marker there starts a sublist; continuations may also contain supported paragraphs, tables, quotes, or blocks. Remove C columns of container indentation before parsing; preserve any excess indentation.
+- A line indented less than C ends the item and is reconsidered in the enclosing context; no parent items are invented. Column-zero headings follow R1.
+- One blank line may separate item paragraphs or sibling items. Two consecutive blank lines end all list levels in the current context. Blank lines inside closed literal blocks do not count.
+- Checkboxes occur only immediately after the marker and separator at the start of the first-line body. The exact forms are `[ ]`, `[X]`, and `[-]`, followed by horizontal whitespace or EOL. `[x]`, `[x ]`, and boxes later in the body are plain text. Their states are not recalculated from children.
+- Description markers `::` and counters such as `[@5]` are ordinary text. If removing C columns cuts through a tab, its remaining columns become spaces in the interpreted value; the source tab remains intact.
 
-### R3. 强调、行内代码和原样文本
+### R3. Emphasis, inline code, and verbatim text
 
-- 成对标记分别为 `*`、`/`、`_`、`+`、`~`、`=`。内容必须非空，首尾不得是空白；不能跨越空白行、行结构或当前行内上下文的边界。
-- 为使中文书写明确，开始标记之前必须是上下文起点、空白、Unicode 标点或符号，或汉字；结束标记之后必须是上下文终点、空白、Unicode 标点或符号，或汉字。汉字按 Unicode `Script=Han` 判断，标点和符号按通用类别 P、S 判断。其他字母及数字不构成边界，所以 `a*bold*b` 不加粗，`这是*重点*文字` 加粗。
-- `~`、`=` 的内容最多占一个物理行，内部完全原样；取遇到的第一个满足边界的同类结束标记。它们内部没有反斜杠转义，也不能包含自己的有效结束标记；需要表达这种内容时使用另一种原样标记或原样块。
-- 其余四种格式可以跨段落内的软换行，也可包含其他允许的行内语法。不同强调可以正确嵌套，不允许相同标记嵌套，也不允许交叉范围。完整的代码、链接、公式等子节点作为整体处理，内部的标记不能关闭外层强调。
-- 从一个开始标记尝试解析到第一个合法的同类结束标记；递归解析合法子节点。若子节点无法在外层结束前闭合，其开始字符按普通文字处理。不得让子节点越过父节点边界寻找结束符。
-- 不提供通用的反斜杠转义：`\*` 不保证显示字面量星号，反斜杠仅在 R4、R5 的规定位置有特殊意义。要可靠地写出标记原文，使用 `=`、`~` 或 EXAMPLE 块。
+- Paired markers are `*`, `/`, `_`, `+`, `~`, and `=`. Content is nonempty, cannot begin or end with whitespace, and cannot cross a blank line, line structure, or enclosing inline-context boundary.
+- An opening marker must follow the context start, whitespace, Unicode punctuation or symbol, or a Han character; a closing marker must precede the context end or one of those categories. Han uses Unicode `Script=Han`; punctuation and symbols use categories P and S. Thus `a*bold*b` is not bold, while `这是*重点*文字` is.
+- `~` and `=` each occupy at most one physical line, interpret nothing inside, and close at the first valid matching marker. They have no internal backslash escapes. Use the other literal marker or a literal block if their own delimiter is needed.
+- The other four emphasis forms may cross soft breaks within a paragraph and contain allowed inline nodes. Distinct styles may nest properly, but identical nested markers and crossing spans are forbidden. Complete child nodes are opaque to the outer marker.
+- Parse from an opener to the first valid matching closer. If a child cannot close before its parent, treat its opening character as text. There is no general backslash escaping; use `=`, `~`, or an EXAMPLE block to preserve markup.
 
-### R4. 上下标、实体与 LaTeX
+### R4. Scripts, entities, and LaTeX
 
-**上下标：**
+**Scripts**
 
-- `^` 或 `_` 前必须已经有一个紧邻的非空白基础字符或完整行内节点。连续上下标允许共用同一基础内容，例如 `x_{i}^{2}`，不得把前一个下标的内容误当作新的基础文字。数学公式内的上下标属于 LaTeX 原文，不再解释为 Org 上下标。
-- 保留三种后缀：单个 `*`；平衡的 `{...}` 或 `(...)`；不加括号的可选正负号和连续文字。括号内容不得为空，可包含平衡的花括号、圆括号及 R1 允许的行内内容，不得跨段落。
-- 无括号内容由 Unicode 字母、十进制数字、逗号、反斜杠和句点组成，可在最前面带 `+` 或 `-`，且必须以字母或数字结束。取满足条件的最长前缀；末尾的逗号或句点留作普通文字。因此 `H_2O` 的下标是 `2O`；若只要 `2`，写 `H_{2}O`。
-- `_` 若已满足完整下划线规则，优先作为下划线；否则尝试下标。`(_text_)` 是下划线，`x_i` 是下标。上下标不跨越外层格式的边界。
+- `^` or `_` must follow an adjacent nonwhitespace base character or complete inline node. Consecutive scripts share the same base, as in `x_{i}^{2}`. Scripts inside math are LaTeX source, not Org script nodes.
+- Suffixes can be `*`, balanced nonempty `{...}` or `(...)`, or a bare sequence with an optional initial sign. Bracketed content can contain balanced braces and parentheses and R1-permitted inline nodes, but cannot cross a paragraph.
+- A bare sequence contains Unicode letters, decimal digits, commas, backslashes, and periods, may begin with `+` or `-`, and must end in a letter or digit. The longest valid prefix wins; trailing commas and periods stay text. `H_2O` has subscript `2O`; use `H_{2}O` for `2` alone.
+- A complete underline takes precedence over a subscript. Scripts cannot cross an enclosing formatting boundary.
 
-**命名实体：**
+**Named entities**
 
-- 形式为 `\NAME` 或 `\NAME{}`。NAME 从 ASCII 字母开始，后面可有 ASCII 字母或数字，采用完整最长名字，不拆成已知短名字加尾文。名字区分大小写；后面紧邻字母或数字时必须用 `{}` 分隔，例如 `\pi{}r`。
-- 可用名字及其符号含义沿用 [Org Syntax v2 的第 6.1 节实体表](https://orgmode.org/worg/org-syntax.html)，不从用户的 Org 配置追加名字。此表是命名实体的符号词典引用；显示为 Unicode、原始名字或导出格式属于后续显示与导出实现，不改变语法边界。
-- 已知实体后跟空 `{}` 时整体是一个实体；后跟非空参数时按下面的 LaTeX 命令规则尝试。未知且没有参数的名字保留为文字。`\alphaBeta` 不拆为 `\alpha` 与 `Beta`。
-- 不隐式把 `--`、`---` 或 `...` 转成排版符号；直接输入的 Unicode 符号是普通字符。
+- `\NAME` or `\NAME{}` starts with an ASCII letter followed by ASCII letters or digits. The longest full name is used and case matters. Use `{}` to separate an entity from following letters or digits, as in `\pi{}r`.
+- Names and meanings follow the [Org Syntax v2 entity table](https://orgmode.org/worg/org-syntax.html), not user configuration. Known entities followed by empty `{}` remain entities; nonempty arguments are considered as LaTeX commands. Unknown names without arguments remain text. No implicit typography converts `--`, `---`, or `...`.
 
-**LaTeX：**
+**LaTeX**
 
-- 行内形式为 `\(...\)`、`$...$`；显示形式为 `\[...\]`、`$$...$$`。四者均要求内容含非空白字符，内部不解释 Org 语法，不验证 TeX 的计算或排版正确性，不执行命令。
-- `\(...\)` 可跨同一段落内的软换行，取第一个未转义的 `\)` 结束，不嵌套同类型定界符。
-- 单美元形式要求内容紧邻两端的 `$` 且没有首尾空白，内容最多两个软换行；结束 `$` 后必须是上下文终点、空白或 Unicode 标点，ASCII `-` 除外。`$ 5 $` 和 `$x$-axis` 均不是公式。优先尝试双美元，禁止从 `$$` 中间拆出单美元公式。
-- 显示形式在结构上下文中可独占多行，也可写在同一行。多行时开始标记是该逻辑行第一个非水平空白内容，结束标记之后只能有水平空白；内部可有空白行。同一行夹在段落文字中的显示形式按行内原样公式节点记录其显示类型，不单独切断段落。
-- `\begin{ENV}` 必须位于逻辑行首，可有前导缩进，其后当行内容属于 LaTeX。ENV 为 ASCII 字母开头的字母、数字、`-`、`_` 序列，可在末尾带一个 `*`。用对应的 `\end{ENV}` 结束，末尾只允许水平空白。环境名区分大小写；嵌套环境按完整的 `\begin{...}`、`\end{...}` 标记栈配对，不因中间空白行或标题样式文字退出一个完整环境。
-- 环境之外，`\COMMAND`（ASCII 字母名及可选末尾 `*`）后立即带一个或多个平衡的 `{...}` 或 `[...]` 参数时，整体记录为原样 LaTeX 片段；参数可以交错并嵌套，不跨段落。已知实体加空 `{}` 优先作为实体，未知无参命令为普通文字。孤立 `\begin`、`\end` 不按通用命令替代有效环境。
-- 识别 LaTeX 定界标记和命令起点时，若其首个反斜杠或 `$` 前紧邻奇数个反斜杠，则该标记被转义，不参与识别或配对；偶数个则仍可参与。内部反斜杠及转义均保留原文。
-- 公式、环境及命令中的未知 TeX 命令仍按原文保存；语法识别不依赖安装 TeX、MathJax 或任何渲染器。缺失结束符按 E2 恢复。
+- Inline forms are `\(...\)` and `$...$`; display forms are `\[...\]` and `$$...$$`. Contents must include a nonwhitespace character, remain literal, and are neither validated as TeX nor executed.
+- `\(...\)` may cross soft breaks within one paragraph and ends at the first unescaped `\)`; same-type delimiters do not nest.
+- Single-dollar content has no edge whitespace and permits at most two soft breaks. The closing `$` must be followed by context end, whitespace, or Unicode punctuation other than ASCII `-`. `$ 5 $` and `$x$-axis` are not formulas. Try double-dollar first and never split `$$` into single-dollar openers.
+- Display forms can occupy one or multiple lines in structural context. A multiline opener is the first non-horizontal-whitespace content on its logical line; after the closer only horizontal whitespace is allowed. Blank lines inside are valid. A display formula embedded in a paragraph is an inline literal formula node with display form.
+- `\begin{ENV}` starts at logical line start with optional indentation; remaining content on that line belongs to the environment. ENV starts with an ASCII letter, continues with ASCII letters, digits, `-`, or `_`, and may end in `*`. Match case-sensitive nested begin/end markers with a stack; the matching `\end{ENV}` allows only trailing horizontal whitespace.
+- Outside environments, an ASCII-letter `\COMMAND` with optional final `*` and one or more immediately adjacent balanced `{...}` or `[...]` arguments is literal LaTeX. Arguments may interleave and nest but cannot cross a paragraph. Known entities followed by empty `{}` take precedence; unknown commands without arguments remain text. Lone `\begin` and `\end` cannot substitute for valid environments.
+- An odd number of immediately preceding backslashes escapes a delimiter or command start; an even number does not. Internal escapes are retained. Recognition requires no TeX or MathJax installation. Unclosed candidates recover under E2.
 
-上述写法对应 [Org 的上下标说明](https://orgmode.org/manual/Subscripts-and-Superscripts.html)、[实体说明](https://orgmode.org/manual/Special-Symbols.html) 及 [LaTeX 片段说明](https://orgmode.org/manual/LaTeX-fragments.html)；固定边界及差异以本文为准。
+### R5. Links, locations, and images
 
-### R5. 链接、定位与图片
+- Links are only `[[target]]` or `[[target][description]]`. A target is nonempty, single-line, and has no leading or trailing horizontal whitespace. A description may be empty and cross paragraph soft breaks, but cannot contain a nested link.
+- In targets and descriptions, `\[`, `\]`, and `\\` decode to literal brackets and backslashes; other backslashes remain. Escapes are handled before delimiter matching. Decoded characters do not become new delimiters or inline syntax. Targets are literal; descriptions follow the R1 inline context.
+- A protocol begins with an ASCII letter, then ASCII letters, digits, `+`, `.`, or `-`, and `:`. Unknown explicit protocols do not become local names; paths without `file:` are not inferred as files.
 
-- 形式仅为 `[[目标]]` 或 `[[目标][显示文字]]`。目标不得为空，不得跨行，首尾不得有水平空白；显示文字可为空，可跨段落内软换行，不得包含嵌套链接。
-- 在目标和显示文字中，`\[`、`\]`、`\\` 分别表示字面的方括号和反斜杠；其他反斜杠保留。定界符扫描先处理这些转义，不能用已转义的括号关闭链接。转义产生的字面字符不再参与新的链接定界或行内语法识别。目标不递归解析任何标记；显示文字仅解析 R1 允许的行内语法。
-- 按下表分派目标。协议前缀为 ASCII 字母开头、后接 ASCII 字母、数字、`+`、`.`、`-`，再接 `:`。显式写出的未知协议不得回退成文档内锚点。没有 `file:` 的路径不被推断成文件链接。
-
-| 目标形式 | 含义与限制 |
+| Target | Meaning |
 | --- | --- |
-| `http://...`、`https://...` | 网页地址。协议之后必须有非空主机部分，不允许未编码的空白或控制字符；其余地址按原文保存，不请求网络来判断有效性 |
-| `file:路径` | 文件链接。路径可相对、绝对或以 `~/` 起始，可含空格；相对路径以当前文档所在目录为基准。没有文档路径时相对位置标记为未解析，不能猜工作目录 |
-| `file:路径::定位` | 文件及文件内定位；路径非空。按下文规则解释定位 |
-| `id:标识值` | 按标题属性 `ID` 查找，可跨文件；仅接受 R0 的标识值，不在 ID 后追加搜索参数 |
-| `#标识值` | 在当前文档按 `CUSTOM_ID` 查找 |
-| `*标题文字` | 在当前文档按标题的名称比较规则查找，不以星号数限定层级 |
-| 其他无协议的非空目标 | 依次匹配当前文档的显式锚点、`NAME`、标题；不进行隐式全文模糊搜索 |
+| `http://...`, `https://...` | A web address with a nonempty host and no unencoded whitespace or control characters; no network check |
+| `file:path` | Relative, absolute, or `~/` file path; a relative path without an origin remains pending |
+| `file:path::selector` | A nonempty file path and a selector, as described below |
+| `id:value` | A heading property `ID`, potentially in a caller-supplied document; no additional search suffix |
+| `#value` | A `CUSTOM_ID` in the current document |
+| `*heading` | A current-document heading by normalized name, independent of level |
+| Other nonempty targets without a protocol | Search explicit targets, then `NAME`, then headings in the current document, without implicit full-text search |
 
-- 文件目标以第一个未编码的 `::` 分隔路径和定位；路径里的字面 `::` 须写 `%3A%3A`。先分隔，再对路径中的有效 `%HH` 按 UTF-8 解码，解码一次；单独的 `%` 或非法 UTF-8 编码保留原文并产生 `invalid-value`。`+` 不变为空格，不展开环境变量或执行路径内容。
-- 文件内定位支持：正十进制行号（第一行为 1）；`*标题`；`#CUSTOM_ID`；`/正则表达式/`；其他非空文字。定位部分只处理链接方括号转义，不做路径的百分号解码。完全由 ASCII 数字组成的定位必须作为行号解释，可有前导零，0 非法；`*`、`#` 之后必须有合法的非空名称或标识值；两端 `/` 之间的正则不能为空。`/…/` 使用下文定义的 org-lite 正则子集，区分大小写。其他文字先按锚点、`NAME`、标题定位，再在目标文件原文中查找首个完全相同的字串；不忽略大小写、不重排搜索词。空定位、无效正则或超出范围的行号产生 `invalid-value`，保留文件链接。
-- 显式锚点为 `<<名称>>`，名称非空、首尾无水平空白，不含 `<`、`>` 或换行；不解释内部格式。`<<<名称>>>` 整体为普通文字，不能从中截取一个双尖括号锚点。
-- 同名标题、锚点、`NAME`、`CUSTOM_ID` 或 `ID` 不自动重命名。在同一候选类别中，匹配超过一个则标记为歧义，不静默取第一个。无匹配时保留链接并记为未解析。
-- `ID` 的候选范围为当前文档及调用方提供的其他文档；规范不要求解析时扫描文件系统，也不规定索引实现。其他文件尚未提供时记录为待解析；发现多个相同 ID 时按歧义处理。
-- 图片沿用文件链接。无显示文字、无文件内定位，且路径后缀为 `.png`、`.jpg`、`.jpeg`、`.gif`、`.svg`、`.webp`、`.bmp`、`.tif`、`.tiff`、`.avif`（ASCII 忽略大小写）时，标记为图片候选。其他扩展名仍为合法文件链接，不禁止后续工具识别图片。带显示文字的图片路径为普通文件链接；不自动打开或预览文件。
-- `file:` 只解释路径，不启用 TRAMP 或附件目录等协议。文件存在与否、网络可达性和图片能否解码均不决定链接的语法合法性。
+- Split a file target at its first unencoded `::`; encode a literal path `::` as `%3A%3A`. Then decode valid `%HH` path bytes once as UTF-8. Lone `%` and invalid UTF-8 are preserved and diagnosed as `invalid-value`. `+` is not a space; environment variables and path contents are not executed.
+- Selectors are positive decimal line numbers (one-based), `*heading`, `#CUSTOM_ID`, `/regexp/`, or other nonempty text. Selector text uses bracket-link escapes but is not percent-decoded. Digit-only values are line numbers, may have leading zeroes, and cannot be zero. Prefixed names and regexps must be nonempty. Plain text searches target, `NAME`, and heading first, then the first exact case-sensitive source substring. Empty, invalid, or out-of-range selectors retain the link with `invalid-value`.
+- An explicit target `<<name>>` is nonempty, has no edge horizontal whitespace, and contains no `<`, `>`, or newline. Its contents are literal. `<<<name>>>` is ordinary text, not a target.
+- Repeated headings, targets, `NAME`, `CUSTOM_ID`, or `ID` are not renamed. Multiple matches in the same candidate category are ambiguous. Unmatched links remain links; external resources or ID scopes not yet supplied remain pending. IDs search the current and caller-supplied documents without scanning the filesystem.
+- A `file:` link with no description or selector and a case-insensitive `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.bmp`, `.tif`, `.tiff`, or `.avif` suffix is an image candidate. Other paths remain file links. No file, network, or image-decoding check is implied. `file:` does not enable TRAMP or attachment management.
 
-文件内定位类型参考 [Org 文件搜索选项](https://orgmode.org/manual/Search-Options.html)，内部名称定位参考 [Org 内部链接](https://orgmode.org/manual/Internal-Links.html)。本文固定了解析与匹配方式。
+#### File-search regular expression subset
 
-**文件搜索的正则子集：**
+- Match Unicode code points without case folding or normalization. Treat CRLF as one LF for searching while preserving source mappings. Choose the earliest start and, at that start, the longest match. Captures are not returned.
+- Support literal characters, `.` (any character except LF), line anchors `^` and `$`, grouping `(...)`, alternation `|`, and quantifiers `*`, `+`, `?`, `{m}`, `{m,}`, and `{m,n}`. Bounds are nonnegative ASCII integers with m ≤ n. Quantifiers apply to characters, classes, or groups and cannot be stacked; groups and alternatives cannot be empty.
+- Support `[abc]`, `[^abc]`, and `[a-z]`; ranges use Unicode code point order. `-` is literal at the start or end and otherwise denotes a range; `^` negates only at the start. POSIX classes and class operations are unsupported.
+- `\n`, `\r`, and `\t` denote controls; a backslash before a regex metacharacter makes it literal. Other escapes, including `\d`, `\w`, and `\1`, are invalid. Link-level escaping must still be applied around regex backslashes and brackets.
+- Backreferences, lookarounds, inline flags, lazy or possessive quantifiers, and evaluation are unsupported. Validate the subset regardless of host regex library. A valid unmatched expression is `unresolved`; an invalid one is `invalid-value`.
 
-- 按 Unicode 码点匹配，不做大小写折叠或 Unicode 规范化。搜索时将 CRLF 作为一个 LF 解释，仍保留到原文位置的对应关系。选择起点最靠前的匹配；同起点有多种长度时选最长匹配，不返回捕获组。
-- 支持普通字符、`.`（任意非 LF 字符）、`^`／`$`（行首／行尾）、`(...)` 分组、`|` 分支，以及 `*`、`+`、`?`、`{m}`、`{m,}`、`{m,n}` 重复。m、n 为非负 ASCII 整数，m 不得大于 n；重复只能修饰字符、字符组或分组，不能连续叠加重复符。分组和分支不得为空。
-- 支持 `[abc]`、`[^abc]`、`[a-z]` 字符组；范围按 Unicode 码点顺序，起点不得大于终点。字符组中 `-` 放在首尾时是字面字符，其他位置只用于范围；`^` 仅在首位表示取反。不支持 POSIX 命名字符类或字符组运算。
-- `\n`、`\r`、`\t` 表示相应控制字符；反斜杠加正则元字符表示字面字符。反斜杠加其他字符（如 `\d`、`\w`、`\1`）为非法转义。正则本身的反斜杠及方括号仍须先按链接外壳的转义规则编码；例如正则 `\n` 在链接目标中可写 `\\n`。
-- 不支持反向引用、环视、内联标志、惰性或占有重复及表达式求值。实现可选用任意语言或正则库，但必须先校验上述子集，不得因库的默认行为扩大语法范围。合法表达式没有匹配时记 `unresolved`；非法表达式记 `invalid-value`，两者都保留文件链接。
+### R6. Tables and column formatting
 
-### R6. 表格与格式标记
+- A logical line beginning with `|` after leading horizontal whitespace is a table row. Consecutive rows form a table; blank or non-table lines end it.
+- Literal `|` characters split cells; a final `|` is optional. Trailing whitespace after a final `|` is not another cell. `||` is one empty cell and `| a ||` has two cells.
+- A separator requires a final `|` and one or more nonempty hyphen runs joined by `+`, as in `|---|` or `|---+----|`. Spaces are not allowed inside; `| - |` is a data row.
+- Trim cell-edge horizontal whitespace before inline parsing. Unequal row lengths are valid; the maximum ordinary row width defines column count, and missing cells are interpreted as empty without rewriting the source. Separators neither determine column count nor imply a header.
+- Every literal `|` splits first, including inside apparent links, formulas, or code. There is no `\|` escape. Use `\vert`, or `\lvert` inside LaTeX, for a pipe.
+- A whole trimmed cell matching `<l>`, `<c>`, `<r>`, `<N>`, `<lN>`, `<cN>`, or `<rN>` is a column format marker. N is a positive ASCII decimal integer without leading zeroes; letters are lowercase. `<0>`, `<L>`, and `abc <r>` are ordinary text.
+- Markers declare alignment and display-column width. The first declaration of each attribute wins; equal repeats are accepted and conflicting repeats are retained with `duplicate`. Layout, wrapping, and truncation are outside this syntax.
+- A row containing at least one marker and otherwise only empty cells or markers is a format row. A marker cell in a mixed data row still contributes formatting but has an empty data value. `#+TBLFM:` is a raw line, not a calculation.
 
-- 逻辑行去掉前导水平空白后以 `|` 开始即为表格行。连续表格行组成一张表；空白行或任何非表格行结束表格。
-- 普通行按每个字面 `|` 分单元格，最后一个 `|` 可以省略。若存在末尾 `|`，其后的水平空白不构成额外单元格；`||` 是一个空单元格，`| a ||` 是两格。
-- 分隔行须有结束 `|`，中间是一个或多个 `-`，或用 `+` 连接的非空 `-` 段，例如 `|---|`、`|---+----|`。分隔行内部不接受空格，`| - |` 是含文字 `-` 的普通行。
-- 单元格去掉首尾用于排版的水平空白后进行行内解析。列数不齐仍有效，以最大普通行列数为列数；缺失格按空值解释，保留原文，不自动补写。分隔行不决定列数，也不自动把首行声明为表头。
-- 任何字面 `|` 都先分格，即便位于链接、公式或行内代码中；没有 `\|` 转义。格内要表达竖线，使用实体 `\vert`，LaTeX 中可写 `\lvert`。
-- 仅当去掉首尾空白的整格内容精确匹配 `<l>`、`<c>`、`<r>`、`<N>`、`<lN>`、`<cN>` 或 `<rN>` 时识别格式标记。N 是大于 0、无前导零的 ASCII 十进制整数，字母须小写。`<0>`、`<L>`、`abc <r>` 均为普通格文字。
-- 标记作用于所在列，记录左／中／右对齐及宽度值，宽度以显示列计数；具体缩略、换行及像素布局不在本规范范围内。同列对齐和宽度分别取第一个声明，后续相同值允许，冲突值保留并记 `duplicate`，不覆盖首值。
-- 一个普通行至少含一个格式标记，且其余格全部为空或格式标记时，该行为格式行，不是数据行；混合数据行中的格式格仍贡献列格式，但该格的数据值为空。`#+TBLFM:` 在表格之后仅是独立文字行，不计算任何单元格。
+### R7. Metadata, properties, and affiliated keywords
 
-格式标记的含义参考 [Org 列宽与对齐说明](https://orgmode.org/manual/Column-Width-and-Alignment.html)；宽松列数和冲突规则按本文执行。
+- A keyword line has optional logical-line indentation, `#+KEY:`, optional whitespace, and a single-line value. Only `TITLE`, `NAME`, `CAPTION`, and the block delimiters in R8 are supported; other keywords are separate raw lines.
+- `TITLE` is valid only at the outermost level before the first heading and may be empty. The first valid title wins; later ones are preserved and diagnosed `duplicate`.
+- A property drawer must immediately follow a heading on the next physical line, without a blank, comment, or planning line. A heading has at most one; document-level drawers are unsupported.
+- Opening and closing lines contain optional horizontal indentation and `:PROPERTIES:` or `:END:`, followed only by horizontal whitespace. Each property is `:KEY:` and an optional single-line value, with optional leading indentation. Keys contain ASCII letters, digits, `_`, `-`, or `+`, are case-insensitive, and cannot be `END`. Empty drawers are valid; blank or non-property lines are not.
+- Trim horizontal whitespace from values and treat them literally. Only valid nonempty `ID` and `CUSTOM_ID` values participate in link resolution. Other keys, including `DIR`, `HEADER-ARGS`, `OWNER+`, and `X_ALL`, are static data, without attachment, execution, append, enumeration, or inheritance semantics.
+- Duplicate keys are compared without ASCII case: preserve all, use the first, and diagnose later occurrences. An invalid first value is not replaced by a later value. A closed drawer containing an invalid line becomes one raw region; an unclosed drawer follows E2.
+- `NAME` and `CAPTION` must immediately precede their content, at the same indentation, with no intervening blank, comment, or unrelated keyword. They may appear consecutively in either order and attach to paragraphs, whole tables or lists, SRC/EXAMPLE/QUOTE blocks, standalone formulas, and LaTeX environments; not headings, drawers, comments, or rules.
+- `NAME` is nonempty, may contain internal spaces, and cannot contain square or angle brackets. `CAPTION` may be empty and parses R1 inline syntax. For repeated declarations of either type on one item, the first wins and later declarations get `duplicate`. Unattached declarations are raw lines with `orphan`; short captions, `RESULTS`, and `ATTR_*` are unsupported.
 
-### R7. 元数据、属性与附属关键字
+### R8. Blocks and comments
 
-- 关键字格式为逻辑行首可选水平空白、`#+KEY:`、可选水平空白、单行值；允许尾随水平空白。只保留 `TITLE`、`NAME`、`CAPTION`，以及 R8 定义的块定界符。其他 `#+KEY:` 独立作为文字行。
-- `TITLE` 只在首个标题之前、最外层有效，可为空；在列表、引用、脚注或标题正文中只是文字行。出现多个有效 `TITLE` 时首个生效，后续保留并记 `duplicate`。
-- 属性抽屉仅紧接标题的下一个物理行有效，中间不得有空白行、注释或计划行；每个标题最多一个。不支持首个标题之前的文档级属性抽屉。
-- 抽屉开始行、结束行分别为可选水平空白加 `:PROPERTIES:`、`:END:`，其后只允许水平空白。各属性行为可选前导水平空白、`:KEY:`、可选水平空白和值；键采用一个或多个 ASCII 字母、数字、`_`、`-`、`+`，忽略大小写。`END` 为保留键。抽屉内可以没有属性，但不得有空白行或非属性行。
-- 属性值去掉首尾水平空白后作为单行文字，可为空，不解释强调、链接或表达式。只有有效非空 `ID`、`CUSTOM_ID` 参与 R5 定位。其余键，包括 `DIR`、`HEADER-ARGS`、`OWNER+`、`X_ALL`，均是静态数据，没有附件、代码参数、追加、枚举或继承行为。
-- 同一抽屉的重复键按 ASCII 忽略大小写比较，首个值生效，后续保留并记 `duplicate`。首个值即使无效也不由后值替换。不同标题的同值 ID 按 R5 的歧义规则处理。
-- 任一非属性行使整个抽屉无效：有闭合 `:END:` 时将整段保留为原文，不提取部分属性；未闭合时按 E2 恢复。属性值无效和重复键属于取值问题，不使完整抽屉失效。
-- `NAME`、`CAPTION` 必须紧邻被修饰内容之前，可连续出现、顺序任意，中间不能有空白行、注释或未知关键字；缩进须与被修饰内容的首行一致。可修饰段落、整张表、整个列表、SRC／EXAMPLE／QUOTE 块及独立公式／LaTeX 环境；不修饰标题、属性抽屉、注释或分隔线。
-- `NAME` 的值为非空名称，允许内部空格，不含方括号、尖括号；按 R0 的名称比较参与 R5 定位。`CAPTION` 为可为空的单行内容，按 R1 解释行内语法。同一内容上的重复 NAME 或 CAPTION 均首个生效，后续保留并记 `duplicate`。
-- 未能附着的 NAME／CAPTION 行保留为独立文字行，记 `orphan`。短题注 `#+CAPTION[short]: long`、`#+RESULTS:`、`ATTR_*` 不属于附属关键字，不附着内容。
+Opening and closing markers may be indented within the current container; they must have the same indentation columns, and closing lines allow only trailing horizontal whitespace.
 
-属性和题注的基本形式参考 [Org 属性语法](https://orgmode.org/manual/Property-Syntax.html) 和 [Org 题注说明](https://orgmode.org/manual/Captions.html)。紧邻要求及重复值处理以本文为准。
-
-### R8. 代码、示例、引用与注释
-
-允许的块头与块尾如下；行前可有当前容器内的水平缩进，块头和块尾须具有相同缩进列数，块尾后只能有水平空白。
-
-| 块类型 | 块头 | 块尾 | 内容解释 |
+| Type | Opening | Closing | Content |
 | --- | --- | --- | --- |
-| 代码 | `#+BEGIN_SRC` 或 `#+BEGIN_SRC 语言名` | `#+END_SRC` | 原样代码，不执行 |
-| 示例 | `#+BEGIN_EXAMPLE` | `#+END_EXAMPLE` | 原样文字 |
-| 引用 | `#+BEGIN_QUOTE` | `#+END_QUOTE` | 段落、列表、表格、分隔线、保留块、公式及行内语法；不含标题、属性抽屉、TITLE 或脚注定义 |
-| 注释 | `#+BEGIN_COMMENT` | `#+END_COMMENT` | 原样注释，不作为正文输出 |
+| Source | `#+BEGIN_SRC` or `#+BEGIN_SRC language` | `#+END_SRC` | Literal code; never executed |
+| Example | `#+BEGIN_EXAMPLE` | `#+END_EXAMPLE` | Literal text |
+| Quote | `#+BEGIN_QUOTE` | `#+END_QUOTE` | Paragraphs, lists, tables, rules, supported blocks, formulas, and inline syntax; no headings, drawers, TITLE, or footnote definitions |
+| Comment | `#+BEGIN_COMMENT` | `#+END_COMMENT` | Literal comment, excluded from body output |
 
-- 语言名可省略；若有，必须是一个 ASCII 字母或数字开头、后接 ASCII 字母、数字、`_`、`-`、`+`、`.` 的非空词，如 `python`、`emacs-lisp`、`c++`。保留原始大小写；未知语言仍为合法代码块，不要求高亮器存在。
-- 块头不接受开关、额外参数、代码执行头参数或尾注释；EXAMPLE、QUOTE、COMMENT 块头不接受任何非空尾部。块尾不接受参数。参数非法时的整段恢复见 E2。
-- 闭合的 SRC、EXAMPLE、COMMENT 中，其他块头、其他类型块尾、标题和 Org 标记均为原样内容，不嵌套；第一个同缩进、同类型、未转义的完整块尾关闭它。内容中可以有空白行。
-- QUOTE 可以嵌套 QUOTE，用栈匹配各自同缩进的引用块头和块尾；内部完整的 SRC、EXAMPLE、COMMENT、独立公式和 LaTeX 环境整体跳过，内部的 END_QUOTE 不关闭外层。遇到第 0 列标题而尚未闭合时按 E2 恢复。
-- SRC、EXAMPLE 先移除列表等外层容器缩进，再从每个非空白内容行移除最多等于本块头缩进的前导列；少于该列数的行只移除已有前导空白，不删正文字符。不按内容的最小缩进再次去缩进，不修剪代码尾部空格。制表符边界按 R2 处理。
-- SRC、EXAMPLE 的行首逗号转义：在上述去缩进后的行上，跳过前导水平空白后，若有一个或多个 `,`，其后紧跟 `*` 或 `#+`，则只移除第一个逗号。例如 `,* x` 的内容值为 `* x`，`,,#+END_SRC` 的值为 `,#+END_SRC`。判断块尾在移除逗号之前完成，因此 `,#+END_SRC` 不结束代码块。
-- SRC、EXAMPLE 也允许直接写未加逗号的标题样式文字；一个已闭合原样块中的 `* text` 不建立标题。为便于在 Org 中打开，示例优先使用逗号形式；这是兼容建议，不是有效性要求。
-- QUOTE 内不自动移除逗号；COMMENT 内容完全保留且不做行内解析。注释块没有隐式子树注释效果。
-- 注释行是逻辑行首可有水平缩进的 `#` 加至少一个水平空白，后接可为空的文字；只注释当前行，内部不建立锚点、ID、脚注或其他语法含义。单独的 `#` 和 `#tag` 是普通文字；`#+...` 永远先按关键字规则处理。
-- 注释只标记哪些内容不属于正文输出；本规范不要求实现具体导出器。没有闭合的 COMMENT 不得让后续整个文档自动消失。
+- A source language is optional; if present it starts with an ASCII letter or digit and continues with ASCII letters, digits, `_`, `-`, `+`, or `.`. Its case is retained; unknown languages are valid. Switches, extra parameters, execution headers, trailing comments, and arguments on EXAMPLE/QUOTE/COMMENT openers or closing lines are unsupported; see E2.
+- Closed SRC, EXAMPLE, and COMMENT blocks are literal and do not nest: the first same-type, same-indent, unescaped closing line ends the block. Blank lines and heading-like lines are allowed inside.
+- QUOTE can nest QUOTE; use matching indentation and a stack. Closed literal child blocks, standalone formulas, and environments are skipped as units. A column-zero heading encountered before a quote closes triggers E2.
+- For SRC and EXAMPLE, first remove enclosing container indentation; then remove up to the opener's indentation from each nonblank content line, without deleting text characters. Do not dedent again by minimum content indentation or trim trailing spaces. Partial tabs follow R2.
+- After dedenting, skip leading horizontal whitespace; if one or more commas immediately precede `*` or `#+`, remove only the first comma in the interpreted SRC/EXAMPLE content. Determine closing lines before comma removal: `,#+END_SRC` is content. Unescaped heading-like lines in a closed literal block are also content.
+- QUOTE does not remove commas. COMMENT contents are fully retained and are not parsed. A comment line is optional indentation, `#`, at least one horizontal whitespace character, and optional text; `#` alone and `#tag` are ordinary text. `#+` is handled as a keyword first. Comments do not implicitly hide subtrees.
 
-块形式、原样内容与注释分别参考 [Org 代码块结构](https://orgmode.org/manual/Structure-of-Code-Blocks.html)、[原样示例](https://orgmode.org/manual/Literal-Examples.html)、[注释说明](https://orgmode.org/manual/Comment-Lines.html)。内部标题处理及恢复规则是 org-lite 的固定约定。
+### R9. Named footnotes
 
-### R9. 命名脚注
+- A reference is `[fn:label]` with exact lowercase `fn` and an R0 footnote label. A definition starts at physical column 0 with `[fn:label]`, at least one horizontal whitespace character, and optional body text. A standalone `[fn:n]` with no following whitespace is a reference, not an empty definition.
+- Definitions are document-wide and may precede or follow references; labels, including numeric labels, need not be sequential. Multiple references may use one label.
+- A definition extends through subsequent lines until the next column-zero definition, heading, two consecutive blank lines, or EOF. One blank line separates paragraphs; blank lines in closed literal regions do not terminate it.
+- Bodies may contain paragraphs, lists, tables, rules, supported blocks, formulas, and inline syntax, but not headings, property drawers, TITLE, or nested footnote definitions. References do not recursively expand definitions.
+- Missing definitions produce `unresolved`. Repeated definitions preserve all and use the first, with `duplicate` for later ones. Anonymous `[fn::content]` and inline-definition `[fn:name:content]` forms are unsupported whole candidates.
 
-- 引用为精确小写前缀 `[fn:标签]`；标签满足 R0 的脚注标签要求。定义为物理行第 0 列的 `[fn:标签]`、至少一个水平空白、可为空的正文。`[fn:n]` 独占一行且没有其后水平空白时为引用所在段落，不是空定义。
-- 定义作用域为整个文档，可在引用之前或之后出现。同一标签可以多次引用；数字标签也是名字，不要求连续编号。
-- 定义正文包括首行标记后的内容及其后行；到下一个第 0 列脚注定义、标题、两个连续空白行或文件末尾之前结束。一个空白行可分段。已闭合原样区域中的空白行不结束定义。
-- 脚注正文可含段落、列表、表格、分隔线、保留内容块、公式及行内语法，不包含标题、属性抽屉、TITLE 或嵌套脚注定义。新定义只能与现有定义并列。
-- 正文里的引用不自动递归展开定义。缺失定义记 `unresolved`；重复定义首个生效，其余保留并记 `duplicate`。不重排、编号、删除或移动原文。
-- `[fn::内容]`、`[fn:名字:内容]` 整个括号串按不支持的行内候选处理，不生成脚注定义或引用。
+## Errors and unsupported content
 
-多行定义边界参考 [Org 创建脚注说明](https://orgmode.org/manual/Creating-Footnotes.html)；固定标签规则和重复处理按本文执行。
+### E1. General principles
 
-## 异常与不支持内容
+1. Any decodable text can be parsed. Syntax errors do not fail the whole document, remove characters, invent closing markers, or silently convert to another Org form.
+2. Excluded syntax has no special meaning but is not prohibited. Surrounding supported syntax can still apply: `* TODO Draft :work:` is a heading, and `- term :: description` is an ordinary list item.
+3. When a recognized complete candidate falls back as a whole, do not search inside it for child syntax. For example, unsupported `[[mailto:a@example.com]]` is whole raw text; `<<<name>>>` cannot yield `<<name>>`.
+4. Unknown keyword and unknown block delimiter lines are separate raw lines. An unknown block does not form a container; its interior is parsed in the current context. Use EXAMPLE for a fully literal region.
+5. Bare `http://` and `https://` URLs, including angle-bracket forms, remain whole raw text without becoming links or emitting `unsupported`. Ordinary text does not globally disable other syntax; use a literal region when exact literal preservation is required.
+6. Do not diagnose every ordinary text span. Diagnostics concern explicit candidates, invalid values, missing boundaries, or references, without modifying source or blocking subsequent structures.
 
-### E1. 共同原则
+### E2. Recovery boundaries
 
-1. 可解码的任何文本都可以被读取和继续解析。语法错误不使整个文档失败，不删除字符，不自动闭合标记，不自动转换成另一种 Org 写法。
-2. “排除”表示不赋予该语法原有的专门含义，不表示禁止用户写这些文字。外层或相邻的合法保留语法仍可成立。例如 `* TODO 写作 :work:` 仍是标题，`- 词 :: 解释` 仍是普通无序项。
-3. 对已识别外壳的候选整体回退时，不再在其内部寻找子语法。例如 `[[mailto:a@example.com]]` 整体是文字，不能退回成一个锚点链接；`<<<词>>>` 不能产生 `<<词>>`。
-4. 未知关键字和未知块的定界行按独立原文行处理。未知块不会建立容器，其两行定界符之间的内容仍按当前上下文解析。例如 BEGIN_VERSE 与 END_VERSE 是文字行，中间合法的 `- ` 仍可成为列表。需要整个未知片段完全原样时使用 EXAMPLE。
-5. 裸 `http://`、`https://` 地址及其尖括号形式作为整体原文保留，避免其中的 `//` 与后续文字误配成斜体；这不启用链接含义，也不报告不支持。普通文本没有全局的“关闭所有语法”模式。其中独立满足保留规则的标记仍有含义，例如未实现的调用样式文字中的 `_` 仍可能符合下标规则；这不启用代码执行。需要精确保留整段标记时使用原样区域。
-6. 不为每一段普通文字报告“不支持”。诊断只针对明确候选、无效取值、丢失边界或引用问题；诊断不改变原文或阻止后续结构识别。
-
-### E2. 恢复边界
-
-| 情况 | 必须采用的解释与恢复 |
+| Situation | Required recovery |
 | --- | --- |
-| 不成对的强调、行内代码、上下标括号、行内公式或 LaTeX 参数 | 只把失败的开始标记当普通字符，随后继续扫描；搜索不越过其允许的行／段落／父节点边界。失败候选不拥有后续文字；普通短标记不强制诊断，明确的 `\(` 未闭合记 `unclosed` |
-| `[[...]]` 外壳完整但协议不支持、目标为空、文件路径为空、网页主机或 ID 标识值非法 | 整个候选原样作为文字；不再解析显示文字。未知协议记 `unsupported`，其余记 `invalid-value`。文件内定位和路径百分号编码错误仍按 R5 保留文件链接 |
-| `[[` 未闭合，或显示文字缺少结尾 | 若在允许范围内无完整外壳，`[[` 作为普通文字，随后继续扫描，记 `unclosed`；不得吞掉后续段落或标题 |
-| 匿名或行内定义脚注候选、radio target | 同行存在结束符时整个候选为原样文字，记 `unsupported`；否则开始符为普通文字，不跨行追寻 |
-| 有效块头找不到块尾 | 块头成为原文行；之后内容回到外层正常解析，不将余下文件视为代码、引用或注释；记录 `unclosed` |
-| 块头带已排除的参数，但有匹配块尾 | 同一容器内的整段保留为一个原文区域，不解释内部内容，也不生成合法内容块；记录 `unsupported`。不得忽略参数后悄悄接受，且不得让代码里的标题泄漏到外层 |
-| 带参数的块头也没有块尾 | 仅将块头保留为文字行，其后按当前上下文解析，记录 `unsupported` 和 `unclosed` |
-| QUOTE 在匹配块尾之前遇到第 0 列标题 | 当前 QUOTE 候选不成立，块头回退为文字行，后续重新按外层解析，标题正常建立；记录 `unclosed` |
-| 属性抽屉缺少 END | 只在下一个第 0 列标题或当前容器末尾之前寻找 END；找不到时开始行回退为文字行，后续正常解析，不提取属性，记 `unclosed`。若存在 END 但中间有空白行，则按下一行的非法抽屉处理 |
-| 已有 END 的属性抽屉含非法属性行 | 整个候选作为原文区域，不提取其中任何属性，记录 `malformed` |
-| 独立公式或 LaTeX 环境没有匹配结束符 | 开始行回退为原文行，其后正常解析，记录 `unclosed`；不得把后续标题永久藏进公式 |
-| 孤立 END、END_SRC、END_QUOTE、LaTeX 环境结束行等 | 独立原文行，记录 `orphan`，不向前补造开始节点 |
-| 孤立 NAME／CAPTION | 原文行，记录 `orphan`，不跨空白行去附着更远的内容 |
-| 有效链接找不到文件、标题、ID、锚点或脚注定义 | 保留合法引用节点和目标原文，标记未解析；不得把合法语法降成文字，也不得自动创建目标 |
+| Unpaired emphasis, inline code, script brackets, inline formula, or LaTeX arguments | Treat only the failed opener as text and continue within its allowed boundary. Short markers need not be diagnosed; an explicit unclosed `\(` gets `unclosed`. |
+| Complete link shell with unsupported protocol, empty target/path, or invalid web host/ID | Preserve the whole candidate as raw text, without parsing its description. Unknown protocols get `unsupported`; other invalid values get `invalid-value`. File selector and percent-decoding errors retain the file link. |
+| Unclosed `[[` or description | If no complete shell is found within the allowed boundary, treat `[[` as text, continue scanning, and emit `unclosed`; do not swallow later paragraphs or headings. |
+| Anonymous/inline-definition footnote or radio target | With a same-line closer, preserve the whole candidate as raw and emit `unsupported`; otherwise treat the opener as text without searching across lines. |
+| Valid block opener without a closer | Preserve the opener as a raw line; parse subsequent content normally in the outer context and emit `unclosed`. |
+| Block opener with excluded parameters and a matching closer | Preserve the complete region as one raw region, do not parse its contents, and emit `unsupported`. Do not accept the block by ignoring its parameters. |
+| Parameterized opener without a closer | Preserve only the opener as a raw line, parse later content normally, and emit both `unsupported` and `unclosed`. |
+| QUOTE encounters a column-zero heading before closing | Fall back the opener to a raw line, parse the heading normally, and emit `unclosed`. |
+| Property drawer without END | Search only up to the next column-zero heading or container end; if absent, fall back the opener, extract no properties, and emit `unclosed`. |
+| Closed drawer containing an invalid property line | Preserve the entire drawer as a raw region, extract no properties, and emit `malformed`. |
+| Unclosed standalone formula or LaTeX environment | Fall back the opener to a raw line, parse subsequent structures normally, and emit `unclosed`. |
+| Orphan END, block closer, or LaTeX environment closer | Preserve a separate raw line and emit `orphan`; do not invent an opener. |
+| Unattached NAME or CAPTION | Preserve a raw line and emit `orphan`; do not attach across a blank line. |
+| Valid reference without a matching file, heading, ID, target, or footnote | Retain the reference node and target; mark it unresolved rather than converting it to text or creating a target. |
 
-“同一容器内”表示不越过所属列表项、脚注定义或引用的边界寻找块尾；最外层原样块可包含标题样式文字。容器终点计算时，先把内部完整原样块视为整体：块内空白行和标题不结束外层容器；列表缩进不足的行仍是硬边界。查找与回退必须保证每次至少处理一个字符或一行，不能反复尝试同一失败候选而不前进。
+Search for a block closer stays inside its list item, footnote definition, or quote container. Closed literal regions are treated as units when finding container boundaries; insufficient list indentation remains a hard boundary. Recovery must always advance by at least one character or line. Once a missing closer is added, reparse the entire valid region.
 
-未闭合 SRC／EXAMPLE／COMMENT 或环境的回退可能使原本想写在内部的文字成为正常结构，这是明确的容错行为。补齐合法结束行后，必须按完整区域重新解释，不保留旧的错误结构。
+### E3. Diagnostics and duplicate definitions
 
-### E3. 诊断及重复定义
+Each diagnostic has a code, source location, and explanation; presentation is up to the caller.
 
-诊断是解析结果的一部分，可以由调用方决定如何展示；不要求弹窗、错误面板或特定编辑器界面。每条至少有类型、源文本范围和说明；类型如下：
-
-| 类型 | 用途 |
+| Code | Meaning |
 | --- | --- |
-| `unsupported` | 完整候选使用未知链接协议、排除的脚注变体或非法块头参数等 |
-| `malformed` | 已闭合但结构不合法，例如属性抽屉里有非属性行 |
-| `unclosed` | 缺少结束标记的明确候选 |
-| `orphan` | 没有对应开始或附属对象的结束行、NAME、CAPTION |
-| `invalid-value` | 非法 ID、格式之外的定位参数、无效正则或编码等 |
-| `duplicate` | 同一取值位置的重复定义，或同一命名空间的重复目标 |
-| `unresolved` | 已知候选文档中没有匹配引用目标 |
-| `ambiguous` | 同一优先类别里存在多个匹配引用目标 |
+| `unsupported` | A complete candidate uses an unknown protocol, excluded footnote form, or unsupported block parameters |
+| `malformed` | A closed candidate is structurally invalid, such as a drawer containing a non-property line |
+| `unclosed` | An explicit candidate lacks a closing marker |
+| `orphan` | A closing line, NAME, or CAPTION lacks an associated opener or object |
+| `invalid-value` | An ID, selector, regular expression, encoding, or other value is invalid |
+| `duplicate` | A repeated field or duplicate target in one namespace |
+| `unresolved` | No target exists in a known, complete search scope |
+| `ambiguous` | Multiple candidates match in the highest-priority applicable category |
 
-重复字段按各自规则保留首值；引用到重名目标则报告歧义。锚点、NAME、标题、CUSTOM_ID、ID、脚注分别属于不同命名空间，跨类别同名不自动算重复；普通内部链接按 R5 优先级选择类别，显式 ID 和脚注只查自身类别。尚未提供的外部文件或 ID 文档集合记为待解析，不以“当前未加载”等同于“目标不存在”。
+Duplicate fields retain the first value; duplicate reference targets are ambiguous. Targets, NAME, headings, CUSTOM_ID, ID, and footnotes have separate namespaces. A not-yet-supplied external file or incomplete ID scope is pending, not confirmed missing.
 
-### E4. 排除语法的预期结果
+### E4. Excluded syntax
 
-| 输入类型 | org-lite 解释 |
+| Input | Interpretation |
 | --- | --- |
-| 行尾 `\\` | 两个反斜杠文字，不强制换行 |
-| `+ 项目`、`1) 项目`、缩进的 `* 项目` | 普通段落，不转换成允许的列表标记 |
-| `- 名词 :: 说明`、`1. [@5] 项目` | 保留普通列表结构，`::`、`[@5]` 为项内文字 |
-| `* TODO [#A] 项目 :tag:`、`* COMMENT 草稿` | 普通标题，文字不改变任务状态、优先级、标签或输出范围 |
-| 时间戳、SCHEDULED、DEADLINE、CLOCK | 普通内容，不参与日期、提醒、计划、重复或工时含义 |
-| 裸 URL、尖括号 URL | 普通文字，不生成链接节点 |
-| `mailto:`、`attachment:`、其他未知协议的方括号链接 | 整个候选为文字，记 `unsupported` |
-| TBLFM、PROPERTY、FILETAGS、OPTIONS、INCLUDE、SETUPFILE、MACRO、CALL、RESULTS、ATTR_* 等关键字 | 独立文字行；不执行、读取、替换、附着或计算 |
-| LOGBOOK 等普通抽屉、VERSE／CENTER／EXPORT／自定义块 | 定界行只是文字，不建立被排除的容器；内部按 E1 处理 |
-| 单行 `: 原文` | 普通段落，不建立原样区域 |
-| Babel 参数、行内 src／call、noweb | 不执行、提取、插入代码或生成结果；完整代码块内部的 `<<helper>>` 只是代码文字 |
+| Trailing `\\` | Literal backslashes, not a hard break |
+| `+ item`, `1) item`, indented `* item` | Paragraph text, not list markers |
+| `- term :: description`, `1. [@5] item` | Ordinary list items; `::` and `[@5]` are text |
+| `* TODO [#A] item :tag:`, `* COMMENT draft` | Ordinary headings without task, priority, tag, or subtree-comment semantics |
+| Timestamps, SCHEDULED, DEADLINE, CLOCK | Ordinary content without scheduling or time tracking |
+| Bare or angle-bracket URLs | Text, not links |
+| Bracket links using `mailto:`, `attachment:`, or other unknown protocols | Whole raw candidates with `unsupported` |
+| TBLFM, PROPERTY, FILETAGS, OPTIONS, INCLUDE, SETUPFILE, MACRO, CALL, RESULTS, ATTR_* | Raw keyword lines, without execution, loading, substitution, attachment, or calculation |
+| LOGBOOK and other ordinary drawers; VERSE, CENTER, EXPORT, and custom blocks | Raw delimiters; excluded containers are not created and their contents follow E1 |
+| Single-line `: text` | Ordinary paragraph, not a literal region |
+| Babel parameters, inline src/call, noweb | No code execution, extraction, insertion, or results; `<<helper>>` inside a closed source block is code text |
 
-## Org 兼容边界
+## Org compatibility
 
-- 文件保留所选 Org 标记，语法范围以本文的规则为准。Org 是设计参考；解析不加载 Emacs 或 Org，也不读取其用户配置。
-- 本文独立固定了大小写、复选框字符、缩进列宽、关键字集合、上下标、链接分派和文件搜索正则规则，解释结果不随所用编程语言或编辑器改变。
-- 主要有意差异包括：中文紧邻强调标记也可生效；列表续行需达到标记后的内容列；完整原样块中的未转义标题也作为原文；强调按完整子节点嵌套；未知块不建立容器；未闭合块不占有余下文档；属性抽屉必须紧接标题且不支持文档级抽屉；内部链接无隐式全文模糊搜索；ID 链接不追加搜索；重复目标明确报告歧义。
-- `NAME`／`CAPTION` 只保留基本形式；不保留短题注、代码开关、代码行引用和导出属性。文件链接必须显式写 `file:`，文件内搜索及符号识别按本文明确规则执行。
-- 与 Org 的相互读取目标是保留源文本及明确的共同子集，不承诺排版、导出结果或所有边界情况完全相同。需要在两者中一致解释时，优先使用空格分隔的强调、明确的括号上下标、逗号转义的原样内容、无歧义的 ID 与显式链接。
-- 对同一输入，遵守本文的实现应产生相同的结构、取值、引用状态及本文明确要求的诊断类型；具体语法树字段名、诊断措辞和显示样式可以不同。[规范示例](examples.md) 是实现验收的输入，当前已全部通过验证。
+org-lite uses selected Org markers but follows this independently fixed syntax. It does not load Emacs, Org, or their configuration. Deliberate differences include Chinese-adjacent emphasis, list continuation at the content column, literal headings inside closed raw blocks, strict property-drawer placement, no implicit fuzzy local-link search, and explicit ambiguity diagnostics. NAME/CAPTION retain only basic forms; code switches, short captions, and export attributes are excluded. Source preservation and the explicit common subset do not guarantee identical Org rendering or every boundary case. The [conformance examples](examples.md) cover the specified behavior.
 
-## 参考来源
+## Sources
 
-org-lite 参考 [Org 官方手册](https://orgmode.org/manual/) 和 [Org Syntax 技术说明](https://orgmode.org/worg/org-syntax.html)，但语法范围及具体解释以本文为准。
+The design refers to the [Org manual](https://orgmode.org/manual/) and [Org Syntax technical reference](https://orgmode.org/worg/org-syntax.html); the rules in this document define org-lite's own behavior.

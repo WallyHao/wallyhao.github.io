@@ -1,16 +1,17 @@
 # vendor/org-lite
 
-[org-lite](https://github.com/WallyHao/org-lite) 的构建产物（`dist/`）副本，
-供 `scripts/org-to-md.mjs` 在构建期解析 `.org` 文档。
+Build output (`dist/`) of [org-lite](https://github.com/WallyHao/org-lite), used by
+`scripts/org-to-md.mjs` to parse `.org` documents at build time.
 
-上游仓库是私有的，CI/部署机不一定能拉到，所以把编译结果直接放进仓库，
-避免 `file:` 依赖或私有 npm 源。只保留 `.js`（去掉 `.map` 与 `.d.ts`）。
+The package is vendored instead of pulled in as a dependency so the build stays reproducible
+and works offline: no `file:` path outside the repository, no private registry, no git
+access during CI. Only `.js` files are kept; `.map` and `.d.ts` are stripped.
 
-- 来源：`https://github.com/WallyHao/org-lite`
-- 提交：见 `COMMIT`
-- 版本：`package.json` 里的 `version`
+- Upstream: <https://github.com/WallyHao/org-lite>
+- Synced commit: see `COMMIT`
+- Version: `version` in `package.json`
 
-## 更新
+## Refreshing
 
 ```bash
 cd /path/to/org-lite && npm run build
@@ -19,4 +20,5 @@ rsync -a --delete --exclude='*.map' --exclude='*.d.ts' dist/ \
 git -C /path/to/org-lite rev-parse HEAD > /path/to/blog-wallyhao/vendor/org-lite/COMMIT
 ```
 
-更新后跑一遍 `npm run org` 和 `npm test`，确认转换结果没有变化。
+Refresh `docs/org/` in the same change (see `docs/org/README.md`), then run `npm run org`
+and confirm the generated Markdown did not change unexpectedly.

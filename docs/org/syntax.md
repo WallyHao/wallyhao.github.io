@@ -1,94 +1,92 @@
-# org-lite 语法指南
+# org-lite Syntax Guide
 
-本文介绍 org-lite v0.1 支持的文档写法。org-lite 借鉴 Org 的文档结构，采用自行确定的语法范围；文件是 UTF-8 纯文本。更精确的空白、嵌套、解析顺序和异常处理规则见[语法参考](reference.md)，完整正反例见[规范示例](examples.md)。
+This guide describes the syntax supported by org-lite v0.1. Documents are UTF-8 plain text. For exact whitespace, nesting, precedence, and recovery rules, see the [syntax reference](reference.md); see the [conformance examples](examples.md) for positive and negative cases.
 
-## 文档结构
+## Document structure
 
-标题从行首开始，由一个或多个 `*` 加空格组成。星号数量表示层级：
+A heading starts at the beginning of a line with one or more `*` followed by whitespace. The number of asterisks is its level:
 
 ```org
-标题前也可以有正文。
+Text can also appear before the first heading.
 
-* 一级标题
-这是正文。
-** 二级标题
-这是二级标题的正文。
-*** 三级标题
+* First-level heading
+Body text.
+** Second-level heading
+More body text.
+*** Third-level heading
 ```
 
-标题构成树。标题下的正文和更深层标题属于该标题的子树；解析结果保留子树范围，可供调用方实现折叠。跳级有效，例如一级标题后可以直接出现三级标题。
+Headings form a tree. A heading owns its body and descendants; its subtree range is retained so a caller can implement folding. Skipped levels are valid.
 
-连续的普通文字行属于同一段落，空行分段。段落内普通换行是软换行，行末 `\\` 不具有 Org 强制换行的含义。
-
-单独一行、至少五个连续连字符表示分隔线：
+Consecutive ordinary lines form a paragraph; blank lines separate paragraphs. Ordinary newlines are soft breaks, and a trailing `\\` does not mean a hard break. A line containing at least five consecutive hyphens is a horizontal rule:
 
 ```org
 -----
 ```
 
-## 列表与复选框
+## Lists and checkboxes
 
-无序列表使用 `-`，有序列表使用数字和 `.`；标记后需要空格。缩进表示子列表和列表项的续行：
-
-```org
-- 第一项
-  这一行仍属于第一项。
-  - 子项目
-- 第二项
-
-1. 第一步
-2. 第二步
-```
-
-同一列表的项目按标记所在列对齐；有序数字不要求连续，原始数字会保留。续行及子列表需要缩进到当前项目标记之后的内容列。两个连续空行结束当前列表。`+`、缩进的 `*` 和 `1)` 不作为列表标记。
-
-列表项开头可以写三种复选框：
+Unordered items use `-`, and ordered items use digits followed by `.`. Whitespace must follow the marker. Indentation determines nested lists and continuation lines:
 
 ```org
-- [ ] 未完成
-- [X] 已完成
-- [-] 部分完成
-  - [X] 已完成的子项
+- First item
+  A continuation of the first item.
+  - Nested item
+- Second item
+
+1. First step
+2. Second step
 ```
 
-复选框后需要空格或行尾。状态按原文记录，解析器不根据子项自动修改状态；小写 `[x]` 是普通文字。
+Sibling markers align in the same column. Ordered numbers need not be consecutive and are retained as written. Continuation lines and nested lists must reach the content column after the current marker. Two consecutive blank lines end the lists in the current context. `+`, an indented `*`, and `1)` are not list markers.
 
-## 行内格式
+A list item may begin with one of three checkboxes:
 
 ```org
-*粗体*  /斜体/  _下划线_  +删除线+
-~行内代码~  =行内原样文字=
+- [ ] Not started
+- [X] Complete
+- [-] Partially complete
+  - [X] Completed subitem
 ```
 
-标记必须成对，内容首尾不能是空白。中文可以直接紧邻标记，例如 `这是*重点*文字`；`a*bold*b` 中的星号则不构成粗体。
+A checkbox must be followed by whitespace or the end of the line. Its state is recorded as written and is not recalculated from child items. Lowercase `[x]` is ordinary text.
 
-粗体、斜体、下划线和删除线可以按规则嵌套。`~代码~` 和 `=原样文字=` 是不同类型，但二者内部都不继续解释 org-lite 标记。没有通用反斜杠转义；需要原样表达标记时，可使用另一种原样标记或示例块。
+## Inline formatting
 
-## 上下标与特殊符号
+```org
+*bold*  /italic/  _underline_  +strike-through+
+~inline code~  =verbatim text=
+```
 
-`^` 表示上标，`_` 表示下标，支持无括号、花括号和圆括号写法：
+Markers must be paired and their contents cannot start or end with whitespace. Chinese characters may directly adjoin markers, as in `这是*重点*文字`; the asterisks in `a*bold*b` do not create bold text.
+
+Bold, italic, underline, and strike-through may nest according to the reference rules. `~code~` and `=verbatim=` are distinct types; neither parses markup inside. There is no general backslash escape: use the other verbatim marker or an example block to preserve markup literally.
+
+## Scripts and special symbols
+
+`^` introduces a superscript and `_` a subscript. Bare, brace, and parenthesis forms are supported:
 
 ```org
 x^2  x^-2  x^{10}  y_(i+1)  x_{i}^{2}
 H_{2}O
 ```
 
-无括号形式会读取最长的合法后缀；例如 `H_2O` 的下标是 `2O`。如果只希望 `2` 是下标，写成 `H_{2}O`。完整下划线标记优先于下标。
+A bare suffix consumes the longest legal sequence: in `H_2O`, the subscript is `2O`. Write `H_{2}O` to make only `2` the subscript. A complete underline takes precedence over a subscript.
 
-命名实体用于表示特殊符号：
+Named entities represent special symbols:
 
 ```org
 \alpha  \to  \pi{}r
 ```
 
-实体名区分大小写；`{}` 可分隔紧随其后的文字。可用名称来自 [Org Syntax v2 实体表](https://orgmode.org/worg/org-syntax.html)，项目保留了[实体数据快照](../src/data/entities.ts)。也可以直接输入 Unicode 字符。
+Entity names are case-sensitive; `{}` separates a name from following text. Names come from the [Org Syntax v2 entity table](https://orgmode.org/worg/org-syntax.html); the project keeps an [entity data snapshot](../src/data/entities.ts). Unicode characters can also be entered directly.
 
-## LaTeX 数学
+## LaTeX mathematics
 
-支持常见的行内公式、显示公式、带参数的命令和环境：
+Inline and display formulas, commands with arguments, and environments are supported:
 
 ```org
-行内公式：\(x^2\) 或 $y_1$。
+Inline: \(x^2\) or $y_1$.
 
 \[
 x^2 + y^2 = z^2
@@ -101,82 +99,82 @@ a = b + c
 \frac{1}{2}
 ```
 
-也支持 `$$...$$` 显示公式。公式和环境的内部保留为 LaTeX 原文，不再解释为 org-lite 行内格式。`$...$` 要求内容紧邻两侧美元符号，并有结束位置的边界限制；需要更明确的行内定界时可使用 `\(...\)`。
+`$$...$$` is also supported for display formulas. Formula and environment contents are retained as LaTeX source, without parsing org-lite inline markup. `$...$` must have content immediately inside both dollar signs and has additional closing-boundary rules; `\(...\)` offers explicit inline delimiters.
 
-## 链接与图片
+## Links and images
 
-链接必须使用双方括号，可以带显示文字：
+Links use double brackets and may have a description:
 
 ```org
 [[https://example.com]]
-[[https://example.com][网站]]
-[[file:notes.org][本地文件]]
+[[https://example.com][Website]]
+[[file:notes.org][Local file]]
 ```
 
-支持 `http:`、`https:`、`file:` 和 `id:`，以及文档内部链接。目标中的方括号和反斜杠使用 `\[`、`\]`、`\\` 转义。裸 URL、`mailto:` 和 `attachment:` 不创建相应链接；附件文件可以用 `file:` 路径访问。
+`http:`, `https:`, `file:`, `id:`, and document-local targets are supported. In targets and descriptions, `\[`, `\]`, and `\\` escape brackets and backslashes. Bare URLs, `mailto:`, and `attachment:` do not create those link types; use `file:` for an attachment file.
 
-文件链接可以指定文件内位置：
+File links can specify a location:
 
 ```org
 [[file:notes.org::25]]
-[[file:notes.org::*计划]]
+[[file:notes.org::*Plan]]
 [[file:notes.org::#plan]]
-[[file:notes.org::查找文字]]
+[[file:notes.org::search text]]
 [[file:notes.org::/a|ab/]]
 ```
 
-依次表示行号、标题、`CUSTOM_ID`、名称或文字、正则搜索。正则只支持[参考中的固定子集](reference.md)，按最左起点、同起点最长结果匹配。
+These select a line, heading, `CUSTOM_ID`, name or text, and regular-expression match respectively. Regular expressions use the [fixed subset](reference.md#file-search-regular-expression-subset), selecting the earliest start and longest match at that start.
 
-文档内部支持标题、属性 ID 和显式锚点：
+Headings, IDs, and explicit targets can be referenced:
 
 ```org
-* 计划
+* Plan
 :PROPERTIES:
 :CUSTOM_ID: plan
 :ID: project-001
 :END:
 
-正文中的 <<details>>。
+More information: <<details>>.
 
-[[*计划]]  [[#plan]]  [[id:project-001]]  [[details]]
+[[*Plan]]  [[#plan]]  [[id:project-001]]  [[details]]
 ```
 
-普通内部名称依次查找显式锚点、`NAME`、标题；没有匹配时不会隐式进行全文模糊搜索。跨文件 `id:` 链接需要调用方提供相关文档。未提供的外部文件是待解析状态，调用方确认文件不存在后才标记为缺失。
+A local name looks for explicit targets, `NAME`, then headings; it does not implicitly search the full text. Cross-document `id:` links require caller-supplied documents. An unsupplied external file is pending; it is missing only when the caller confirms its absence.
 
-图片使用文件链接，例如 `[[file:images/diagram.png]]`。没有显示文字和文件内定位、且扩展名是常见图片格式的链接会标为图片候选；解析本身不读取或预览图片。
+Images use file links such as `[[file:images/diagram.png]]`. A link without a description or file selector, with a recognized image extension, is marked as an image candidate. Parsing does not read or preview the file.
 
-## 表格
+## Tables
 
-使用 `|` 划分单元格，连续表格行组成一张表，横线行用于分隔：
+Use `|` to separate cells. Consecutive table lines form a table; separator rows divide it:
 
 ```org
-| 名称 | 数量 |
-|------+------|
-| 苹果 |    3 |
-| 梨   |    2 |
+| Item  | Quantity |
+|-------+----------|
+| Apple |        3 |
+| Pear  |        2 |
 ```
 
-整格中的 `<l>`、`<c>`、`<r>` 声明列对齐方式，`<10>` 声明宽度；也可以组合为 `<r10>`：
+A whole cell containing `<l>`, `<c>`, or `<r>` declares alignment; `<10>` declares width. They can be combined as `<r10>`:
 
 ```org
-| <l> | <r10> |
-| 苹果 | 3 |
+| <l>   | <r10> |
+| Apple |     3 |
 ```
 
-各行列数可以不一致，缺失的格按空值理解，原文不会自动补齐。字面 `|` 总是先分隔单元格；格内需要表示竖线时可用实体 `\vert`。表格公式 `#+TBLFM:` 不作为计算语法。
+Rows may have different numbers of cells; missing cells are interpreted as empty without changing the source. A literal `|` always splits cells; use `\vert` to represent a pipe inside a cell. `#+TBLFM:` does not calculate table formulas.
 
-## 文档元数据与属性
+## Metadata and properties
 
-文档标题使用 `#+TITLE:`，只在第一个标题之前、最外层有效：
+`#+TITLE:` sets the document title only at the outermost level before the first heading:
 
 ```org
-#+TITLE: 我的笔记
+#+TITLE: My notes
 ```
 
-标题下可以紧接属性抽屉，每个属性占一行：
+A property drawer can immediately follow a heading, with one property per line:
 
 ```org
-* 项目
+* Project
 :PROPERTIES:
 :ID: project-001
 :CUSTOM_ID: project
@@ -184,26 +182,26 @@ a = b + c
 :END:
 ```
 
-属性抽屉必须紧接标题，中间不能有空行。属性键不区分 ASCII 大小写，属性值是单行静态文字。`ID` 和 `CUSTOM_ID` 用于链接定位；其他键只保存数据，不向子标题继承，也不触发 Org 的工作流。
+There must be no blank line between the heading and drawer. Property keys are ASCII case-insensitive; values are static single-line text. `ID` and `CUSTOM_ID` support link resolution. Other keys store data only: they do not inherit to child headings or activate Org workflows.
 
-## 名称与题注
+## Names and captions
 
-`#+NAME:` 为紧随其后的内容命名，`#+CAPTION:` 提供题注：
+`#+NAME:` names the immediately following content; `#+CAPTION:` supplies a caption:
 
 ```org
 #+NAME: fruit-table
-#+CAPTION: 水果数量
-| 水果 | 数量 |
-| 苹果 | 3 |
+#+CAPTION: Fruit quantities
+| Fruit | Quantity |
+| Apple | 3        |
 
-查看 [[fruit-table]]。
+See [[fruit-table]].
 ```
 
-两者可以依任意顺序连续放在内容之前，中间不能有空行或其他不相关的行。它们可用于段落、列表、表格、保留的内容块及独立公式。重复声明保留原文并产生诊断，以首个值为准。
+The keywords can appear consecutively in either order, with no blank or unrelated line between them and the content. They can attach to paragraphs, lists, tables, supported content blocks, and standalone formulas. Repeated declarations remain in the source and produce a diagnostic; the first value takes effect.
 
-## 内容块
+## Content blocks
 
-支持代码块、原样示例块和引用块。开始和结束标记各占一行，关键字不区分 ASCII 大小写：
+Source, literal example, and quote blocks are supported. Opening and closing markers occupy their own lines; keywords are ASCII case-insensitive:
 
 ```org
 #+BEGIN_SRC python
@@ -211,44 +209,44 @@ print("hello")
 #+END_SRC
 
 #+BEGIN_EXAMPLE
-这里的 *标记* 原样保留。
+*Markup* is literal here.
 #+END_EXAMPLE
 
 #+BEGIN_QUOTE
-这里是一段包含 *格式* 的引用。
+A quote with *formatting*.
 #+END_QUOTE
 ```
 
-代码语言名可以省略；代码块只保存原文，不执行代码，也不提取源文件。示例块内部不解析文字格式；引用块内部可以包含段落、列表、表格和允许的行内格式。
+The source language is optional. Source blocks preserve content without executing or extracting code. Example blocks do not parse formatting; quote blocks can contain paragraphs, lists, tables, and permitted inline formatting.
 
-代码块和示例块支持行首逗号转义。例如 `,* 标题` 的内容值为 `* 标题`；`,#+END_SRC` 是内容，不会提前关闭代码块。块头、块尾的缩进及未闭合时的恢复规则见[语法参考](reference.md)。
+Source and example blocks support leading comma escapes: `,* Heading` has the content value `* Heading`, and `,#+END_SRC` is content rather than a closing marker. See the [reference](reference.md#r8-blocks-and-comments) for indentation and unclosed-block recovery.
 
-## 脚注与注释
+## Footnotes and comments
 
-脚注使用命名引用和独立定义：
+Named footnotes use references and separate definitions:
 
 ```org
-这里有一条说明。[fn:note]
+A statement with a note.[fn:note]
 
-[fn:note] 这是脚注内容。
+[fn:note] The footnote content.
 ```
 
-同一脚注可以多次引用，定义可以放在引用之前或之后。缺少或重复定义时保留原文并提供诊断；匿名脚注和行内定义变体不支持。
+A footnote can be referenced multiple times and defined before or after its references. Missing or repeated definitions are preserved and diagnosed. Anonymous and inline-definition variants are not supported.
 
-注释可以是一行或一个块：
+A comment can be a line or block:
 
 ```org
-# 这是一行注释。
+# A comment line.
 
 #+BEGIN_COMMENT
-这里是多行注释。
+A multi-line comment.
 #+END_COMMENT
 ```
 
-注释内部不解析其他标记。单独的 `#`、`#tag` 和标题里的 `COMMENT` 不是这些注释写法。
+Other markup inside comments is not parsed. A lone `#`, `#tag`, or `COMMENT` in a heading is not one of these comment forms.
 
-## 不支持的内容与错误处理
+## Unsupported content and recovery
 
-org-lite 不赋予以下 Org 写法原有的专门含义：标题 TODO 状态和标签、日期与日程、工时、进度统计、描述列表、表格公式、附件管理、通用抽屉、Babel 执行、动态块、宏和文件引入等。未经支持的文字仍保留在原文中。
+The following Org constructs have no original special meaning in org-lite: heading TODO states and tags, dates and scheduling, clocking, progress statistics, description lists, table formulas, attachment management, general drawers, Babel execution, dynamic blocks, macros, and file inclusion. Unsupported text remains in the source.
 
-未闭合或无效的语法按[恢复规则](reference.md#异常与不支持内容)处理，并在适用时产生诊断。解析结果保留原始文字、换行和位置；引用分析将已解析、待解析、缺失、歧义和无效分别表示。解析器不会隐式读取外部文件或执行文档中的代码。
+Unclosed or invalid syntax follows the [recovery rules](reference.md#errors-and-unsupported-content), with diagnostics where applicable. Results retain source text, line endings, and positions; reference analysis distinguishes resolved, pending, missing, ambiguous, and invalid states. The parser does not implicitly read external files or execute document code.

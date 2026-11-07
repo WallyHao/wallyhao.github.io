@@ -1,31 +1,31 @@
 # yaml-language-server: $schema=./quartz/plugins/quartz-plugins.schema.json
 #
-# Quartz v5 站点配置。
-# 这里只有「站点级参数」和「插件装配」两类东西，没有任何内容数据。
-# 内容数据永远只存在于 content/ 目录下的 Markdown 文件里。
+# Quartz v5 site configuration.
+# Only site-level settings and plugin wiring live here; there is no content data.
+# Content only ever exists as org-lite documents under org/.
 #
-# TODO(wallyhao): 把 pageTitle / baseUrl / footer 链接换成自己的。
+# TODO(wallyhao): replace pageTitle, baseUrl and the footer links.
 
 configuration:
-  # 站点标题，显示在左上角和页面 <title> 里
+  # Site title, shown in the top-left corner and in <title>
   pageTitle: Wally
   pageTitleSuffix: ""
 
-  # 站内跳转不整页刷新（客户端路由）
+  # Navigate between pages without a full reload (client-side routing)
   enableSPA: true
-  # 鼠标悬停内链时弹出预览卡片
+  # Show a preview card when hovering internal links
   enablePopovers: true
 
-  # 不接入任何统计服务；要加统计改成 { provider: plausible } 等
+  # No analytics; switch to { provider: plausible } and friends to enable
   analytics: null
 
-  # 界面语言（日期格式、搜索框文案等），可选 zh-CN / zh-TW / en-US ...
+  # UI locale (date formats, search box copy). zh-CN, zh-TW, en-US, ...
   locale: zh-CN
 
-  # TODO: 换成你的真实域名，不要带 https://，用于 RSS / sitemap / canonical URL
+  # TODO: your real domain without https://; used for RSS, sitemap and canonical URLs
   baseUrl: blog.example.com
 
-  # 这些目录/文件不会被发布
+  # These directories and files are never published
   ignorePatterns:
     - private
     - drafts
@@ -33,14 +33,14 @@ configuration:
     - .obsidian
 
   theme:
-    # 字体自托管在 quartz/static/fonts/lxgw-wenkai/，不走 Google Fonts
+    # Fonts are self-hosted in quartz/static/fonts/lxgw-wenkai/, not loaded from Google Fonts
     fontOrigin: local
     cdnCaching: false
     typography:
       header: LXGW WenKai Screen
       body: LXGW WenKai Screen
       code: IBM Plex Mono
-    # 墨观 Inkstone 色板：浅色 = 宣纸 Dimmed，深色 = 玄墨 Dimmed
+    # Inkstone palette: light = Xuanzhi Dimmed, dark = Xuanmo Dimmed
     colors:
       lightMode:
         light: "#e9e2d4"
@@ -64,15 +64,15 @@ configuration:
         textHighlight: "#c57f7344"
 
 # ---------------------------------------------------------------------------
-# 插件管线：transformers → filters → emitters → pageTypes
-# 每个条目就是一次「装配」，不代表数据。
-#   source: npm 包名 / github:user/repo / ./本地目录
-#   order:  同一类别内的执行顺序，依赖关系靠它保证
-#   layout: 仅纯组件插件需要，声明它出现在页面骨架的哪个插槽
+# Plugin pipeline: transformers -> filters -> emitters -> pageTypes.
+# Each entry is one plugin instance, not data.
+#   source: npm package name / github:user/repo / a local ./directory
+#   order:  execution order within a category; plugin dependencies rely on it
+#   layout: component-only plugins only; declares the layout slot to render into
 # ---------------------------------------------------------------------------
 plugins:
-  # --- transformers: 逐篇文档的 Markdown/HTML 变换 ---------------------------
-  # 首次访问固定为亮色主题，不跟随系统的深色偏好
+  # --- transformers: per-document Markdown/HTML transforms -------------------
+  # Pin the first-visit theme to light instead of following the OS preference
   - source: ./plugins/default-theme
     enabled: true
     order: 1
@@ -146,19 +146,20 @@ plugins:
     enabled: false
     order: 92
 
-  # 自定义本地插件示例：从文档正文提炼「预计阅读时间」并渲染到文章开头
+  # Local plugin example: derive a reading time from the body and render it above the article
   - source: ./plugins/reading-time
     enabled: true
     order: 75
 
-  # --- 前端资源 / 字体 ------------------------------------------------------
-  # 关闭：它自带一套 header/body/code 默认值（Schibsted Grotesk / Source Sans Pro），
-  # 会无视 configuration.theme.typography 并注入 h1..h6 的 font-family，
-  # 还会往 <head> 塞一条 Google Fonts 链接。本站字体自托管，用不上。
+  # --- Frontend assets / fonts ---------------------------------------------
+  # Disabled: it ships its own header/body/code defaults (Schibsted Grotesk /
+  # Source Sans Pro), ignores configuration.theme.typography, injects
+  # h1..h6 font-family rules and adds a Google Fonts link to <head>.
+  # Fonts here are self-hosted, so it is not needed.
   - source: "@quartz-community/quartz-fonts"
     enabled: false
 
-  # 结构/排版来自 ink-paper，配色与字体由 quartz/styles/custom.scss 覆盖
+  # Layout comes from ink-paper; colors and fonts are overridden in quartz/styles/custom.scss
   - source: "@quartz-themes/core"
     enabled: true
     options:
@@ -166,14 +167,14 @@ plugins:
       mode: both
       themeFonts: false
 
-  # --- filters: 决定哪些文档最终被发布 --------------------------------------
+  # --- filters: decide which documents are published ------------------------
   - source: "@quartz-community/remove-draft"
     enabled: true
 
   - source: "@quartz-community/explicit-publish"
     enabled: false
 
-  # --- emitters: 生成 HTML 之外的产物 --------------------------------------
+  # --- emitters: emit artifacts other than HTML -----------------------------
   - source: "@quartz-community/alias-redirects"
     enabled: true
 
@@ -186,15 +187,16 @@ plugins:
   - source: "@quartz-community/favicon"
     enabled: true
 
-  # OG 图依赖 Google Fonts 下载字体；本站用自托管的霞鹜文楷，取不到字体，
-  # 先关掉。想恢复社交卡片就换回 Google 字体再打开。
+  # Disabled: OG images download fonts from Google Fonts, which cannot resolve
+  # the self-hosted LXGW WenKai. Re-enable together with a Google font if social
+  # cards are needed.
   - source: "@quartz-community/og-image"
     enabled: false
 
   - source: "@quartz-community/cname"
     enabled: true
 
-  # --- pageTypes: 决定某一类页面怎么渲染 ------------------------------------
+  # --- pageTypes: decide how a class of pages renders -----------------------
   - source: "@quartz-community/canvas-page"
     enabled: false
 
@@ -207,7 +209,7 @@ plugins:
   - source: "@quartz-community/tag-page"
     enabled: true
 
-  # --- 纯组件插件：只负责往页面骨架里塞一块 UI ------------------------------
+  # --- Component-only plugins: drop a piece of UI into the layout -----------
   - source: "@quartz-community/explorer"
     enabled: false
     layout:
@@ -244,12 +246,12 @@ plugins:
   - source: "@quartz-community/content-meta"
     enabled: true
     options:
-      # 阅读时间交给本地插件算（对中文更准），这里只留日期
+      # Reading time is handled by the local plugin (more accurate for CJK); keep the date only
       showReadingTime: false
     layout:
       position: beforeBody
       priority: 20
-      # 首页不显示日期（首页没有「文章时间」这个概念）
+      # No date on the home page: it has no article timestamp
       condition: not-index
 
   - source: "@quartz-community/tag-list"
@@ -297,13 +299,13 @@ plugins:
   - source: "@quartz-community/footer"
     enabled: true
     options:
-      # TODO: 换成你自己的链接，留空则不显示
+      # TODO: your own links; leave empty to hide
       links: {}
     layout:
       position: footer
       priority: 50
 
-  # 首页/文件夹页的「最近更新」列表
+  # Recent posts list on the home page
   - source: "@quartz-community/recent-notes"
     enabled: true
     options:
@@ -316,7 +318,7 @@ plugins:
     layout:
       position: afterBody
       priority: 50
-      # index 条件在 quartz.ts 里注册
+      # The index condition is registered in quartz.ts
       condition: index
 
   - source: "@quartz-community/spacer"
@@ -333,7 +335,7 @@ plugins:
     options: {}
     order: 50
 
-  # 必装：负责解析 frontmatter。这里关掉属性面板，只保留解析能力。
+  # Required: parses frontmatter. The properties panel is disabled; parsing stays.
   - source: "@quartz-community/note-properties"
     enabled: true
     options:
@@ -370,7 +372,7 @@ plugins:
       display: all
 
 # ---------------------------------------------------------------------------
-# 页面骨架：决定每个插槽里放什么、顺序如何
+# Page skeleton: which components go into which slot, and in what order
 # ---------------------------------------------------------------------------
 layout:
   groups:

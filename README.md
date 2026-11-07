@@ -43,9 +43,8 @@ docs/org/          org-lite 语法文档拷贝（写作前先看这里）
 AGENTS.md          智能体/贡献者说明
 quartz.config.yaml  站点参数 + 插件装配 + 页面骨架
 quartz.ts           TS 覆写层：函数型配置、自定义 layout 条件
-plugins/            本地插件（示例：reading-time）
+plugins/            本地插件（reading-time、default-theme）
 quartz/             Quartz 内核，含插件管线
-docs/               Quartz 自带文档，不参与本站构建
 public/             构建产物（已 gitignore）
 ```
 
@@ -237,8 +236,10 @@ npx quartz plugin list                   # 查看已安装
 
 1. 把 `quartz.config.yaml` 里的 `baseUrl` 改成真实域名；
 2. 推到 GitHub 后按 [Hosting 文档](https://quartz.jzhao.xyz/hosting) 接 GitHub Pages / Cloudflare Pages / Vercel；
-3. `.github/workflows/` 里是 Quartz 上游的 CI 配置，其中 `deploy-v5.yaml` 只对上游仓库生效，
-   需要的话换成自己的部署 action。
+3. 构建命令用 `npm run build`（必须经过 org → md 转换），产物目录 `public/`。
+
+上游自带的 `.github/`、`Dockerfile`、`CODE_OF_CONDUCT.md` 和 Quartz 文档副本都已删除，
+它们只对上游仓库有意义；需要 CI 时按上面的构建命令自己加。
 
 ## 上游
 

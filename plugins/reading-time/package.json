@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "从文档正文提炼预计阅读时间，并渲染在文章开头",
+  "description": "Derive an estimated reading time from the document body and render it above the article",
   "exports": {
     ".": "./index.js"
   },
   "quartz": {
     "name": "reading-time",
     "displayName": "Reading Time",
-    "description": "从文档正文提炼预计阅读时间，并渲染在文章开头",
+    "description": "Derive an estimated reading time from the document body and render it above the article",
     "category": "transformer",
     "quartzVersion": "^5.0.0",
     "defaultOrder": 75,

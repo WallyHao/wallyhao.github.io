@@ -13,5 +13,5 @@ replit.nix
 quartz/cli/tui/dist/
 .turbo/
 
-# org → md 的生成物
+# Generated from org/ by scripts/org-to-md.mjs
 content/

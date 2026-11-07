@@ -1,17 +1,18 @@
 /**
- * 本地插件：固定默认主题。
+ * Local plugin: pin the default theme.
  *
- * Quartz 的 darkmode 组件在首次访问时会跟随系统偏好
- * （prefers-color-scheme: dark → 暗色）。这里在 <head> 里、在 darkmode
- * 脚本之前，把 localStorage 的 theme 补成指定值，让「首次访问」落在指定主题上。
- * 用户手动切换后仍以自己的选择为准（localStorage 已有值时不覆盖）。
+ * On a first visit the Quartz darkmode component follows the OS preference
+ * (prefers-color-scheme: dark -> dark). This plugin writes the configured
+ * theme into localStorage from the <head>, right after the darkmode script
+ * runs, so a first visit lands on the configured theme. An existing preference
+ * is never overwritten, so a manual toggle keeps winning.
  */
 export default function DefaultTheme(opts = {}) {
   const theme = opts.theme === "dark" ? "dark" : "light"
 
   return {
     name: "DefaultTheme",
-    // Quartz 用这几个方法判断插件类别；这里不需要改文档，给个空实现
+    // Quartz detects the plugin category from these methods; nothing to transform here
     markdownPlugins() {
       return []
     },
@@ -31,7 +32,7 @@ export default function DefaultTheme(opts = {}) {
                 ", " +
                 JSON.stringify(theme) +
                 ");",
-              "    // darkmode 脚本先于本文件执行，已按系统偏好设过一遍属性，这里纠正回来",
+              "    // The darkmode script runs first and applied the OS preference; correct it",
               '    document.documentElement.setAttribute("saved-theme", ' +
                 JSON.stringify(theme) +
                 ");",

@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "让首次访问固定落在指定主题（默认亮色），不受系统深色偏好影响",
+  "description": "Pin the first-visit theme (light by default) instead of following the OS dark preference",
   "exports": {
     ".": "./index.js"
   },
   "quartz": {
     "name": "default-theme",
     "displayName": "Default Theme",
-    "description": "首次访问时把主题默认值写进 localStorage，不受系统深色偏好影响",
+    "description": "Write the default theme into localStorage so a first visit ignores the OS preference",
     "category": "transformer",
     "quartzVersion": "^5.0.0",
     "defaultOrder": 1,

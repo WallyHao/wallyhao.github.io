@@ -1,25 +1,30 @@
-# org-lite 语法文档（拷贝）
+# org-lite syntax reference (copied)
 
-本目录是 [org-lite](https://github.com/WallyHao/org-lite) 官方文档的**逐字拷贝**，
-供写作和改代码时查阅，不是本站的文档，也不要在这里写文章。
+This directory holds a verbatim copy of the [org-lite](https://github.com/WallyHao/org-lite)
+documentation. It is reference material for writing posts and for working on the converter,
+**not** part of the published site, and no posts belong here.
 
-| 文件           | 内容                                     |
-| -------------- | ---------------------------------------- |
-| `syntax.md`    | 语法指南：能写什么、怎么写，附例子       |
-| `reference.md` | 语法参考：精确边界、优先级、错误恢复规则 |
-| `examples.md`  | 规范示例：正例与反例                     |
-| `model.md`     | 数据模型与 `parse` / `analyze` 接口契约  |
+| File           | Contents                                                        |
+| -------------- | --------------------------------------------------------------- |
+| `syntax.md`    | Syntax guide: what you can write and how, with examples         |
+| `reference.md` | Syntax reference: exact boundaries, precedence, recovery rules  |
+| `examples.md`  | Conformance examples: positive and negative cases               |
+| `model.md`     | Data model and the `parse` / `analyze` interface contracts      |
 
-- 来源：<https://github.com/WallyHao/org-lite>
-- 同步自 commit：`09b417f`（见 `vendor/org-lite/COMMIT`，两者应保持一致）
-- 本站使用的解析器：`vendor/org-lite/dist`，经 `scripts/org-to-md.mjs` 调用
+## Provenance
 
-## 更新方式
+- Upstream: <https://github.com/WallyHao/org-lite>
+- Parser snapshot used by the site: `vendor/org-lite/dist`, commit recorded in `vendor/org-lite/COMMIT`
+- These files are copied from the upstream working tree and are not modified here.
+  Do not edit them: re-copy instead.
+
+## Refreshing
 
 ```bash
 git -C /path/to/org-lite fetch && git -C /path/to/org-lite checkout <commit>
 cp /path/to/org-lite/docs/{syntax,reference,examples,model}.md docs/org/
 ```
 
-解析器本体和文档要一起更新：先按 `vendor/org-lite/README.md` 更新 `dist/`，
-再拷贝这四份文档，最后跑一遍 `npm run org`，确认文章转换结果没有变化。
+Update the parser snapshot and these documents together: refresh `vendor/org-lite/dist`
+first (see `vendor/org-lite/README.md`), then copy the four files, then run `npm run org`
+and confirm the generated Markdown did not change unexpectedly.

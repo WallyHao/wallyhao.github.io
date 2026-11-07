@@ -1,22 +1,23 @@
 #!/usr/bin/env node
 /**
- * org-lite → Markdown 转换器
+ * org-lite -> Markdown converter.
  *
- * 把 org/ 下的 .org 文档转成 content/ 下的 .md，交给 Quartz 正常构建。
- * 站点本身仍然只认 Markdown，所以不需要改任何 Quartz 内核代码。
+ * Turns the .org documents under org/ into .md files under content/ so the
+ * regular Quartz build can consume them. The site itself only knows Markdown,
+ * so no Quartz core code has to change.
  *
- *   node scripts/org-to-md.mjs                 # org/ → content/
+ *   node scripts/org-to-md.mjs                 # org/ -> content/
  *   node scripts/org-to-md.mjs --src org --out content
- *   node scripts/org-to-md.mjs --check         # 只报告，不写文件
+ *   node scripts/org-to-md.mjs --check         # report only, write nothing
  *
- * 约定：文件顶部的 #+KEY: 行是文档元数据，会转成 YAML frontmatter。
- *   #+TITLE:        → title
- *   #+DATE:         → date
- *   #+DESCRIPTION:  → description
- *   #+TAGS:         → tags（空格或逗号分隔）
- *   #+DRAFT:        → draft
- *   #+UNLISTED:     → unlisted
- *   #+ALIASES:      → aliases
+ * Leading `#+KEY:` lines are document metadata and become YAML frontmatter:
+ *   #+TITLE:        -> title
+ *   #+DATE:         -> date
+ *   #+DESCRIPTION:  -> description
+ *   #+TAGS:         -> tags (space or comma separated)
+ *   #+DRAFT:        -> draft
+ *   #+UNLISTED:     -> unlisted
+ *   #+ALIASES:      -> aliases
  */
 
 import fs from "node:fs"
@@ -29,7 +30,7 @@ import { parse, positionAt } from "../vendor/org-lite/dist/index.js"
 import { entities } from "../vendor/org-lite/dist/data/entities.js"
 
 // ---------------------------------------------------------------------------
-// 小工具
+// Helpers
 // ---------------------------------------------------------------------------
 
 const META_KEYS = new Set(["TITLE", "DATE", "DESCRIPTION", "TAGS", "DRAFT", "UNLISTED", "ALIASES"])
@@ -41,18 +42,18 @@ const text = (mapped) => (typeof mapped === "string" ? mapped : (mapped?.text ??
 
 const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
-/** 原样写入一段 Markdown（不转义、不加工），用于 GFM 脚注、删除线、表格等 */
+/** Emit raw Markdown (no escaping) for GFM footnotes, strikethrough and tables */
 const raw = (value) => ({ type: "html", value })
 
 const stripTrailingNewline = (s) => s.replace(/\n+$/, "")
 
-/** org-lite 的 span 是 UTF-8 字节偏移，必须按字节切片 */
+/** org-lite spans are UTF-8 byte offsets, so slice the buffer rather than the string */
 function sliceSource(source, span) {
   return Buffer.from(source, "utf8").subarray(span.start, span.end).toString("utf8")
 }
 
 // ---------------------------------------------------------------------------
-// 元数据
+// Metadata
 // ---------------------------------------------------------------------------
 
 function extractMeta(source) {
@@ -97,16 +98,16 @@ function buildFrontmatter(meta, relPath, warnings) {
     data.aliases = meta.ALIASES.split(/[,\s]+/).filter(Boolean)
   }
   if (!data.title) {
-    warnings.push("缺少 #+TITLE:，用文件名作为标题")
+    warnings.push("no #+TITLE:, falling back to the file name")
   }
   if (!data.date) {
-    warnings.push("缺少 #+DATE:，日期将回退到文件时间")
+    warnings.push("no #+DATE:, the date falls back to the file mtime")
   }
   return data
 }
 
 // ---------------------------------------------------------------------------
-// 链接
+// Links
 // ---------------------------------------------------------------------------
 
 function headingSlugger() {
@@ -126,14 +127,14 @@ function linkUrl(target, ctx) {
           anchor = "#" + ctx.slugForDoc(slugFromPath(p), text(sel.value))
         } else if (sel.kind === "custom_id") anchor = "#" + text(sel.value)
         else if (sel.kind === "local_name") anchor = "#" + text(sel.value)
-        // line / regexp / text 选择器在静态站点里没有对应物，丢弃
+        // Line, regexp and text selectors have no equivalent on a static site
       }
       p = p.replace(/\.(org|md)$/i, "").replace(/^\.\//, "")
       if (!p.startsWith("/")) p = "/" + p
       return p + anchor
     }
     case "id": {
-      // 跨文档 ID：用第一遍扫描出来的索引解析到具体页面
+      // Cross-document ID: resolve through the index built in the first pass
       const hit = ctx.ids.get(text(target.value))
       return hit ? `${hit.path}${hit.anchor ? "#" + hit.anchor : ""}` : "#" + text(target.value)
     }
@@ -186,7 +187,7 @@ function convertLink(node, ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// 行内
+// Inline
 // ---------------------------------------------------------------------------
 
 function entityChar(name) {
@@ -194,7 +195,7 @@ function entityChar(name) {
   return typeof ch === "string" ? ch : undefined
 }
 
-/** 行内节点 → HTML 字符串（用于 <sub>/<sup>/<u> 这类只能走 HTML 的场景） */
+/** Inline nodes -> HTML string, for cases that can only be expressed as HTML (<sub>, <sup>, <u>) */
 function inlinesToHtml(nodes, ctx) {
   return nodes.map((n) => inlineToHtml(n, ctx)).join("")
 }
@@ -265,7 +266,7 @@ function convertInline(node, ctx) {
       if (node.style === "underline") {
         return [raw(`<u>${inlinesToHtml(node.content, ctx)}</u>`)]
       }
-      // 删除线需要 GFM 扩展，这里直接写 ~~...~~
+      // Strikethrough needs the GFM extension, so write the marker directly
       return [raw(`~~${inlinesToHtml(node.content, ctx)}~~`)]
     }
     case "inline_code":
@@ -292,8 +293,9 @@ function convertInline(node, ctx) {
     case "target":
       return [raw(`<a id="${escapeHtml(text(node.name))}"></a>`)]
     case "raw_inline":
-      // org-lite 把不成立的候选（如 mailto: 链接、未闭合标记）整段放进 raw_inline，
-      // 这里是原文回退区，必须原样输出，否则内容会静默消失。
+      // org-lite puts rejected candidates (mailto: links, unclosed markup) into
+      // raw_inline; this is the source fallback region and must be emitted verbatim,
+      // otherwise the text disappears silently.
       return [{ type: "text", value: sliceSource(ctx.source, node.span) }]
     default:
       return []
@@ -301,7 +303,7 @@ function convertInline(node, ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// 块级
+// Blocks
 // ---------------------------------------------------------------------------
 
 function inlineToMarkdown(nodes, ctx) {
@@ -341,8 +343,8 @@ function convertListItem(item, ctx) {
   const children = convertBlocks(item.body, ctx)
   if (children.length === 0) children.push({ type: "paragraph", children: [] })
 
-  // mdast-util-to-markdown 没有 GFM 扩展时不认 checked 字段，
-  // 直接把 `[ ]` / `[x]` 原样写进段落开头，交给 remark-gfm 解析。
+  // Without the GFM extension mdast-util-to-markdown ignores `checked`,
+  // so write the marker into the paragraph and let remark-gfm parse it back.
   if (item.checkbox) {
     const marker = item.checkbox.state === "checked" ? "[x] " : "[ ] "
     const first = children[0]
@@ -351,7 +353,7 @@ function convertListItem(item, ctx) {
   }
 
   if (item.checkbox?.state === "partial") {
-    // GFM 只有勾选/未勾选两态，用注释把「部分完成」保留在源码里
+    // GFM only has checked/unchecked, so keep the partial state as a comment
     const first = children[0]
     if (first.type === "paragraph") first.children.push(raw(" <!-- partial -->"))
     else children.unshift({ type: "paragraph", children: [raw("<!-- partial -->")] })
@@ -371,7 +373,7 @@ function convertList(node, ctx) {
 }
 
 function footnoteDefinition(node, ctx) {
-  // org-lite 会保留重复定义并记 duplicate；Markdown 里重复定义是非法的，只取首个
+  // org-lite keeps duplicate definitions and reports them; Markdown forbids them, keep the first
   if (ctx.footnotes.has(node.label)) return []
   ctx.footnotes.add(node.label)
   const inner = toMarkdown({
@@ -383,7 +385,7 @@ function footnoteDefinition(node, ctx) {
   return [raw(`[^${node.label}]: ${body}`)]
 }
 
-/** #+NAME: / #+CAPTION: 附着在块上，转换成锚点与题注段落 */
+/** #+NAME: / #+CAPTION: attach to a block and become an anchor and a caption paragraph */
 function applyAffiliations(node, out, ctx) {
   const affiliations = node.affiliations
   if (!affiliations?.length) return out
@@ -440,7 +442,7 @@ function convertBlockBody(node, ctx) {
       return [raw(`$$\n${body}\n$$`)]
     }
     case "raw_block":
-      // 未知 #+ 行：org-lite 只当作普通文本，这里保留下来
+      // Unknown #+ lines: org-lite treats them as plain text, keep them as such
       return [
         {
           type: "paragraph",
@@ -492,10 +494,10 @@ function convertHeadings(headings, ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// 文档
+// Documents
 // ---------------------------------------------------------------------------
 
-/** 第一遍：收集 :ID: / :CUSTOM_ID:，供跨文档 id: 链接使用 */
+/** First pass: collect :ID: / :CUSTOM_ID: for cross-document id: links */
 function collectIds(document, pagePath) {
   const found = []
   const visit = (headings) => {
@@ -530,7 +532,7 @@ function collectHeadingSlugs(document) {
   return map
 }
 
-/** 标题纯文本（不经过 mdast 序列化，避免转义影响 slug） */
+/** Plain text of a heading, without mdast serialization so escaping cannot affect the slug */
 function inlineToMarkdownPlain(nodes) {
   return nodes
     .map((n) => {
@@ -556,12 +558,12 @@ function convertFile(source, relPath, ids, slugMaps) {
 
   const parsed = parse({ id: relPath, text: body, origin: relPath })
   if (!parsed.ok) {
-    throw new Error(`解析失败：${JSON.stringify(parsed.error)}`)
+    throw new Error(`parse failed: ${JSON.stringify(parsed.error)}`)
   }
   const document = parsed.value.document
 
-  // org-lite 的诊断：unsupported / unclosed / orphan 等意味着这段语法没被识别，
-  // 会按普通文字处理或丢弃，值得提醒作者。
+  // org-lite diagnostics: unsupported / unclosed / orphan mean the construct was
+  // not recognized and will be treated as plain text or dropped. Warn the author.
   const snapshot = { id: relPath, text: body, origin: relPath }
   for (const diagnostic of parsed.value.diagnostics ?? []) {
     if (diagnostic.code === "duplicate") continue
@@ -577,7 +579,7 @@ function convertFile(source, relPath, ids, slugMaps) {
     ids,
     footnotes: new Set(),
     slugFor: (headingText) => slugMap.get(headingText) ?? slugText(headingText),
-    // 跨文档链接：用目标文档自己的 slug 表（同名标题会被编号）
+    // Cross-document links use the target document's own slug table
     slugForDoc: (pagePath, headingText) =>
       slugMaps.get(pagePath)?.get(headingText) ?? slugText(headingText),
   }
@@ -600,7 +602,7 @@ function slugText(value) {
 }
 
 // ---------------------------------------------------------------------------
-// 文件遍历与 CLI
+// File walking and CLI
 // ---------------------------------------------------------------------------
 
 function walk(dir) {
@@ -617,7 +619,7 @@ function walk(dir) {
   return out
 }
 
-/** 遍历所有文件（含非 .org），用于同步静态资源 */
+/** Walk every file (including non-.org ones) to sync static assets */
 function walkAll(dir) {
   const out = []
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -637,7 +639,7 @@ function parseArgs(argv) {
     else if (arg === "--out") opts.out = argv[++i]
     else if (arg === "--check") opts.check = true
     else if (arg === "--help" || arg === "-h") {
-      console.log("用法：node scripts/org-to-md.mjs [--src org] [--out content] [--check]")
+      console.log("usage: node scripts/org-to-md.mjs [--src org] [--out content] [--check]")
       process.exit(0)
     }
   }
@@ -650,14 +652,14 @@ function main() {
   const outDir = path.resolve(opts.out)
 
   if (!fs.existsSync(srcDir)) {
-    console.error(`找不到源目录：${opts.src}`)
+    console.error(`source directory not found: ${opts.src}`)
     process.exit(1)
   }
 
   const files = walk(srcDir).sort()
   const rels = files.map((fp) => path.relative(srcDir, fp))
 
-  // 第一遍：收集 ID，让跨文档 id: 链接能解析
+  // First pass: collect IDs so cross-document id: links can resolve
   const ids = new Map()
   const parsedDocs = rels.map((rel) => {
     const source = fs.readFileSync(path.join(srcDir, rel), "utf8")
@@ -709,7 +711,7 @@ function main() {
     }
   }
 
-  // org/ 里的图片等静态资源同步到 content/，让文件链接能正常访问
+  // Sync static assets (images and so on) from org/ to content/ so links work
   const assetFiles = walkAll(srcDir).filter((fp) => !fp.toLowerCase().endsWith(".org"))
   for (const fp of assetFiles) {
     const rel = path.relative(srcDir, fp)
@@ -726,7 +728,7 @@ function main() {
       if (!keep) {
         const target = path.join(outDir, stale)
         if (fs.existsSync(target)) fs.unlinkSync(target)
-        console.log(`  - 删除过期产物 ${path.join(opts.out, stale)}`)
+        console.log(`  - removed stale output ${path.join(opts.out, stale)}`)
       }
     }
     fs.mkdirSync(outDir, { recursive: true })
@@ -737,7 +739,7 @@ function main() {
   }
 
   console.log(
-    `\n${generated.length} 篇转换完成${warned ? `，${warned} 条提示` : ""}${failed ? `，${failed} 篇失败` : ""}`,
+    `\n${generated.length} converted${warned ? `, ${warned} warning(s)` : ""}${failed ? `, ${failed} failed` : ""}`,
   )
   if (failed > 0) process.exit(1)
 }

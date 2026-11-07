@@ -1,12 +1,12 @@
-# org-lite v0.1 规范示例
+# org-lite v0.1 Conformance Examples
 
-本文与 [syntax.md](syntax.md) 配套，给出实现应满足的输入和解释。每例彼此独立；只有明确提供的文件才属于引用解析范围。代码围栏里的文字是输入，围栏外是预期结果；“不产生某语法”不等于删除原文。
+These examples complement the [syntax guide](syntax.md) and specify inputs and expected interpretations. Each case is independent; only explicitly supplied files are in scope for reference resolution. Fenced examples are input. A construct that does not produce a syntax node is still preserved in the source.
 
-这些是完整语法的规范用例，当前实现已逐项验证全部 52 个示例，使用方式见 [README](../README.md)。字节、制表符和尾随空格不易展示时，以明确标注的字符串表示为准。
+All 52 cases are checked by the current implementation. See the [README](../README.md) for usage. Some inputs intentionally retain Chinese text to exercise Unicode and byte offsets; escaped strings specify otherwise invisible bytes, tabs, and trailing spaces.
 
-## 文档与列表
+## Document Structure and Lists
 
-### S01. 标题树与段落
+### S01. Heading tree and paragraphs
 
 ```org
 开篇第一行
@@ -20,9 +20,9 @@
 * TODO [#A] 下一项 :work:
 ```
 
-预期：开篇两行属于一个段落，随后另起一段；两个一级标题并列，三级标题属于“项目”，不补造二级标题。最后标题的全部文字为 `TODO [#A] 下一项 :work:`，无任务、优先级或标签含义。
+Expected: The first two lines form one paragraph, followed by another. The two level-one headings are siblings; the level-three heading belongs to the project without an invented level-two heading. The final heading text includes `TODO`, priority, and tag markers with no special task semantics.
 
-### S02. 标题与排除的星号列表
+### S02. Headings and excluded asterisk lists
 
 ```org
 * 标题
@@ -30,9 +30,9 @@
 *没有空格
 ```
 
-预期：只有第一行是标题；后两行是标题正文中的普通段落，不是列表或新标题。
+Expected: Only the first line is a heading; the remaining lines are ordinary paragraphs in its body, not lists or headings.
 
-### S03. 分隔线与强制换行
+### S03. Horizontal rules and hard line breaks
 
 ```org
 第一行\\
@@ -43,9 +43,9 @@
 ----- text
 ```
 
-预期：前两行同属一个段落，两个反斜杠保留，无强制换行节点。仅 `-----` 是分隔线，后两行组成普通段落。
+Expected: The first two lines form one paragraph; both backslashes remain and no hard-break node is created. Only `-----` is a rule; the final two lines form a paragraph.
 
-### S04. 列表标记的范围
+### S04. List marker scope
 
 ```org
 - 苹果
@@ -56,9 +56,9 @@
 1) 也不是列表
 ```
 
-预期：先是两项无序列表，再是两项有序列表；`::`、`[@5]` 是项内文字。末两行是列表外普通段落。
+Expected: Two unordered items are followed by two ordered items. `::` and `[@5]` are item text. The last two lines form a paragraph outside the lists.
 
-### S05. 续行、子列表和项内内容块
+### S05. Continuation lines, nested lists, and blocks
 
 ```org
 - 主项
@@ -71,9 +71,9 @@
 - 第二项
 ```
 
-预期：主项内容列 C 为 2，包含一个段落、一个子列表和一个代码块。子项内容列 C 为 4。代码内容值为 `hello` 加原换行，无列表缩进。第二项与主项同级。
+Expected: The parent item has content column C=2 and contains a paragraph, nested list, and code block. The child has C=4. The code value is `hello` and its original newline, without list indentation. The second item is a sibling.
 
-### S06. 数字、内容列和不足的缩进
+### S06. Ordinals, content columns, and insufficient indentation
 
 ```org
 09. 第一步
@@ -82,9 +82,9 @@
   两列文字。
 ```
 
-预期：有序列表保留 `09`、`02` 两个原始数字，不要求连续；C 均为 4。“两列文字”缩进不足，结束列表，成为列表外段落。
+Expected: The ordered list preserves the original nonconsecutive ordinals `09` and `02`; both content columns are 4. The final line is insufficiently indented and forms a paragraph outside the list.
 
-### S07. 空白行结束列表
+### S07. Blank lines terminate lists
 
 ```org
 - 第一项
@@ -97,9 +97,9 @@
   列表外文字。
 ```
 
-预期：第一项含两个段落；第二项属于同一列表。两个连续空白行关闭列表，最后一行即使缩进两列仍在列表外。
+Expected: The first item contains two paragraphs; the second belongs to the same list. Two consecutive blank lines close the list, so the final indented line is outside it.
 
-### S08. 三种复选框
+### S08. Three checkbox states
 
 ```org
 - [ ] 未完成
@@ -109,9 +109,9 @@
 1. [ ] 有序项也可带框
 ```
 
-预期：识别三个状态及嵌套框；父项 `[-]` 保持原状态，不因唯一子项已完成就改为 `[X]`。最后一行建立相邻的有序列表。
+Expected: All three states and the nested checkbox are recognized. The parent remains `[-]` even though its only child is checked. The last line starts an adjacent ordered list.
 
-### S09. 不构成复选框的位置和字符
+### S09. Invalid checkbox positions and characters
 
 ```org
 - [x] 小写
@@ -121,28 +121,28 @@
 正文中的 [X]
 ```
 
-预期：没有复选框；前四行仍是普通列表项，末行在列表外。
+Expected: No checkboxes are recognized. The first four lines remain ordinary list items; the last is outside the list.
 
-## 行内格式与数学
+## Inline Formatting and Mathematics
 
-### S10. 六种文字格式
+### S10. Six inline formats
 
 ```org
 *粗体* /斜体/ _下划线_ +删除线+ ~code~ =verbatim=
 ```
 
-预期：依次识别六种不同节点；代码和原样文本的语义类型不同。
+Expected: Six distinct nodes are recognized in order; code and verbatim text have different semantic types.
 
-### S11. 中文相邻与词内标记
+### S11. Adjacent Chinese text and within-word markers
 
 ```org
 这是*重点*文字，另有/斜体/。
 a*bold*b 与 * bold* 与 *bold *。
 ```
 
-预期：第一行的粗体和斜体有效。第二行三种星号写法均不产生粗体：分别因词内边界、内容首空白、内容尾空白而失败。
+Expected: The bold and italic on the first line are valid. The three asterisk candidates on the second line fail because of within-word boundaries, leading whitespace, and trailing whitespace respectively.
 
-### S12. 嵌套与不交叉
+### S12. Nesting without crossing
 
 ```org
 *粗体里有 /斜体/ 和 ~a*b~*。
@@ -150,20 +150,20 @@ a*bold*b 与 * bold* 与 *bold *。
 *a /b* c/
 ```
 
-预期：第一段为粗体，内部有斜体和完整代码，代码里的 `*` 不结束粗体。第二段粗体内容为 `a /b`，内部 `/` 不能跨过粗体末端寻找结束；后面的 ` c/` 是文字，不建立交叉斜体。
+Expected: The first paragraph is bold and contains italic and complete inline code; the code’s `*` does not close bold. In the second paragraph, italic cannot cross the bold boundary and the trailing text remains plain.
 
-### S13. 原样区域不解析内部标记
+### S13. Verbatim content does not parse nested markup
 
 ```org
 ~*不是粗体* [[file:a.org]]~
 =/不是斜体/ [fn:n]=
 ```
 
-预期：分别只有代码、原样文本节点；内部没有粗体、斜体、链接或脚注引用。换行仍属于同一外层段落。
+Expected: Only code and verbatim nodes are created; their contents contain no bold, italic, link, or footnote nodes. The newline remains inside the outer paragraph.
 
-### S14. 未闭合行内格式恢复
+### S14. Recovery from unclosed inline markup
 
-恢复：E2。
+Recovery: E2.
 
 ```org
 ~没有结束
@@ -176,26 +176,26 @@ x^{未闭合
 正常段落。
 ```
 
-预期：第一个代码候选不能跨行闭合；未闭合粗体和上下标均不能跨空白行。标题“下一节”及最后段落正常识别，原文全部保留。
+Expected: The first code candidate cannot close across a line; unclosed bold and scripts cannot cross a blank line. The next heading and final paragraph are recognized and all source is retained.
 
-### S15. 上下标的多种形式
+### S15. Forms of subscripts and superscripts
 
 ```org
 x^2 H_2O H_{2}O x^-2 x^{y^{z}} y_(i+1) x^* x_{i}^{2}
 (_text_)
 ```
 
-预期：分别识别上标 `2`、下标 `2O`、下标 `2`、上标 `-2`、含嵌套上标的括号内容、圆括号下标、单星号上标，以及共用基础字符 x 的下标 i 和上标 2。最后一行是括号内的下划线 `text`，不是下标。
+Expected: The examples recognize superscript `2`, subscript `2O`, subscript `2`, superscript `-2`, nested superscript, parenthesized subscript, star superscript, and subscript `i` plus superscript `2` sharing `x`. The last line is underlined text, not a subscript.
 
-### S16. 命名实体的终止
+### S16. Entity termination
 
 ```org
 \alpha \to \pi{}r \alphaBeta \notAnOrgEntity
 ```
 
-预期：前三处为实体 α、箭头、π，`r` 为普通文字。后两个未知完整名字保留为文字，不截取其中已知前缀，不产生未知 LaTeX 无参命令。
+Expected: The first three entities represent alpha, an arrow, and pi; `r` is text. The final two unknown full names remain text and are not split at known prefixes or treated as argument-free LaTeX commands.
 
-### S17. LaTeX 的保留形式
+### S17. Supported LaTeX forms
 
 ```org
 行内 \(x^2\) 与 $y_1$，也有 $$z^2$$。
@@ -205,9 +205,9 @@ a + b
 \frac{1}{2}
 ```
 
-预期：识别两处行内公式、段落中的双美元显示公式、一处独立显示公式和一个带两个参数的原样 LaTeX 命令。公式内部的 `^`、`_` 不产生 Org 上下标。
+Expected: Two inline formulas, a double-dollar display formula in a paragraph, a standalone display formula, and a literal LaTeX command with two arguments are recognized. Scripts within formulas are not Org scripts.
 
-### S18. 单美元边界
+### S18. Single-dollar boundaries
 
 ```org
 $x$，中文标点允许。
@@ -215,9 +215,9 @@ $ 5 $
 $x$-axis
 ```
 
-预期：只有第一行含公式；第二行因首尾空白失败，第三行因结束美元后紧邻 `-` 失败，不形成公式。
+Expected: Only the first line contains a formula. The second fails because of edge whitespace and the third because `-` immediately follows the closing dollar sign.
 
-### S19. LaTeX 环境与嵌套
+### S19. Nested LaTeX environments
 
 ```org
 \begin{equation}
@@ -227,11 +227,11 @@ x &= 1
 \end{equation}
 ```
 
-预期：一个完整的原样 LaTeX 环境，内部按环境名配对，Org 不把内容建立为其他语法结构，也不要求安装排版工具。
+Expected: One literal LaTeX environment is recognized with nested environments matched by name; its contents are not parsed as Org and no typesetting installation is required.
 
-### S20. 未闭合公式和环境
+### S20. Unclosed formulas and environments
 
-恢复：E2。
+Recovery: E2.
 
 ```org
 \[
@@ -242,30 +242,30 @@ x = 1
 * 下一节
 ```
 
-预期：独立公式和环境均无闭合，开始行回退为原文并记 `unclosed`；两个标题正常建立，不能被隐藏在公式内部。
+Expected: Both the display formula and environment are unclosed: their opening lines fall back to raw text with `unclosed` diagnostics. Both headings remain visible.
 
-## 链接、定位与图片
+## Links, Locations, and Images
 
-### S21. 网页链接与显示文字
+### S21. Web links and descriptions
 
 ```org
 [[https://example.com]]
 [[http://example.com/docs][查看 *说明*]]
 ```
 
-预期：两个网页链接，第二个显示文字含粗体；解析时不访问网络。
+Expected: Two web links are recognized; the second description contains bold text. Parsing does not access the network.
 
-### S22. 链接括号转义
+### S22. Escaped link brackets
 
 ```org
 [[file:notes\[old\].org][旧版]]
 ```
 
-预期：文件目标值为 `notes[old].org`，显示文字为“旧版”；转义括号不终止链接。未提供该文件时保持待解析。
+Expected: The file target is `notes[old].org` and its description means “old version”. Escaped brackets do not terminate the link. An unsupplied file remains pending.
 
-### S23. 文件内定位
+### S23. Locations inside files
 
-提供目标文件 `notes.org`，内容精确为下面六行：
+Supply a target file `notes.org` with exactly these six lines:
 
 ```org
 * 计划
@@ -276,7 +276,7 @@ x = 1
 needle text
 ```
 
-当前文档的输入：
+Current document:
 
 ```org
 [[file:notes.org::6]]
@@ -288,9 +288,9 @@ needle text
 [[file:notes.org::/(needle|other) text/]]
 ```
 
-预期：分别定位第六行、标题、CUSTOM_ID、显式锚点、第六行字串，以及同一行的两种正则匹配。分组和分支使用 org-lite 规定的 `(...)`、`|`，不依赖 Emacs。缺失目标文件与语法错误分开处理。
+Expected: The links locate line six, a heading, a CUSTOM_ID, an explicit target, a substring on line six, and two regular-expression matches on that line. Groups and alternatives use the specified org-lite subset, independent of Emacs. Missing files and syntax errors are distinct.
 
-### S24. 标题、显式锚点与 NAME
+### S24. Headings, explicit targets, and NAME
 
 ```org
 [[*计划]] [[spot]] [[grid]]
@@ -300,11 +300,11 @@ needle text
 | a | b |
 ```
 
-预期：三个链接分别指向标题、正文锚点、具名表格；定义可以晚于引用出现。
+Expected: The three links resolve to the heading, body target, and named table respectively. Definitions may follow their references.
 
-### S25. CUSTOM_ID 与跨文档 ID
+### S25. CUSTOM_ID and cross-document ID
 
-当前文档：
+Current document:
 
 ```org
 [[#local]] [[id:remote-001]]
@@ -314,7 +314,7 @@ needle text
 :END:
 ```
 
-调用方另提供 `remote.org`：
+The caller also supplies `remote.org`:
 
 ```org
 * 远端
@@ -323,11 +323,11 @@ needle text
 :END:
 ```
 
-预期：两个链接均可解析。若不提供远端文档及完整 ID 索引，第二个保持待解析，不要求扫描磁盘。
+Expected: Both links resolve. Without the remote document and a complete ID scope, the second remains pending; disk scanning is not required.
 
-### S26. 重名与未解析链接
+### S26. Duplicate names and unresolved links
 
-诊断：duplicate、ambiguous、unresolved。
+Diagnostics: `duplicate`, `ambiguous`, `unresolved`.
 
 ```org
 [[*重名]] [[不存在]]
@@ -335,9 +335,9 @@ needle text
 * 重名
 ```
 
-预期：重复标题记 `duplicate`；第一个链接歧义，不默认取第一个标题。第二个链接保留为合法内部链接并记 `unresolved`，不变成普通文字。
+Expected: The duplicate headings produce `duplicate`; the first link is ambiguous rather than silently choosing the first heading. The second remains a valid link with `unresolved`.
 
-### S27. 排除的链接和 radio target
+### S27. Excluded links and radio targets
 
 ```org
 https://example.com
@@ -347,11 +347,11 @@ https://example.com
 <<<术语>>>
 ```
 
-预期：没有链接或锚点节点。未知协议候选整体作为原文并记 `unsupported`，邮件显示文字里的星号也不解析为粗体；三尖括号不截取双尖括号锚点。
+Expected: No link or target nodes are created. Unknown-protocol candidates remain whole raw text with `unsupported`; markup in their descriptions is not parsed. Triple angle brackets do not produce a double-angle target.
 
-### S28. 未闭合链接不吞掉后文
+### S28. Unclosed links do not consume later content
 
-恢复：E2。
+Recovery: E2.
 
 ```org
 [[https://example.com][缺少末尾
@@ -360,9 +360,9 @@ https://example.com
 [[https://example.com][完整]]
 ```
 
-预期：首个开始符作为文字，不能跨空白行或标题追寻结尾；后面的标题和完整链接正常识别。
+Expected: The first opener remains text and cannot search past a blank line or heading. The later heading and complete link are recognized.
 
-### S29. 图片候选仍是文件链接
+### S29. Image candidates remain file links
 
 ```org
 [[file:images/plot.PNG]]
@@ -370,11 +370,11 @@ https://example.com
 [[file:report.pdf]]
 ```
 
-预期：三者均为文件链接；仅第一处带图片候选属性，第二处有显示文字，第三处为普通文件。均不承诺预览或文件存在。
+Expected: All three are file links. Only the first is an image candidate: the second has a description and the third is an ordinary file. Preview and existence are not implied.
 
-## 表格与元数据
+## Tables and Metadata
 
-### S30. 基本表格、分隔行和不齐的列
+### S30. Tables, separators, and uneven columns
 
 ```org
 | 名称 | 数量 |
@@ -384,9 +384,9 @@ https://example.com
 ||
 ```
 
-预期：一张两列表格，含一个分隔行；“梨”行的第二格按空值解释，末行第一格为空、缺失第二格。不修改源文补列，不自动把首行设为表头。
+Expected: One two-column table contains a separator. Missing cells in the last rows are interpreted as empty without changing the source; the first row is not automatically a header.
 
-### S31. 列格式、宽度与冲突
+### S31. Column formats, widths, and conflicts
 
 ```org
 | <l> | <r10> |
@@ -394,17 +394,17 @@ https://example.com
 | <c> | <0> |
 ```
 
-预期：第一行为格式行；第一列左对齐，第二列右对齐且宽度为 10。第三行是数据行，其中 `<c>` 是冲突格式，第一格数据值为空，记 `duplicate`，仍保留首个左对齐声明；`<0>` 是普通格文字。
+Expected: The first row is a format row: column one is left-aligned and column two is right-aligned with width 10. The later `<c>` conflicts, emits `duplicate`, and does not replace the first alignment; `<0>` is ordinary cell text.
 
-### S32. 表格先分格
+### S32. Table splitting precedes inline parsing
 
 ```org
 | ~a|b~ | \vert |
 ```
 
-预期：三个单元格，前两格分别含未闭合的代码样式文字；行内代码不保护字面竖线。第三格的 `\vert` 是实体，可表达字面竖线而不增加列。
+Expected: There are three cells. The first two contain unclosed code-like text because inline code does not protect literal pipes. The third contains the `\vert` entity without introducing a new column.
 
-### S33. TITLE 的位置、大小写和重复
+### S33. TITLE position, case, and duplicates
 
 ```org
 #+title: 第一份 *笔记*
@@ -413,9 +413,9 @@ https://example.com
 #+TITLE: 章节里的文字
 ```
 
-预期：文档标题为第一行的值，其中含粗体。第二行保留并记 `duplicate`，不覆盖首值。章节正文里的 TITLE 是文字行，不改变文档标题。
+Expected: The first value is the document title and contains bold. The second is retained with `duplicate` and does not overwrite it. TITLE in a section body is a raw line.
 
-### S34. 属性只存静态信息
+### S34. Properties hold static information
 
 ```org
 * 项目
@@ -428,9 +428,9 @@ https://example.com
 ** 子项
 ```
 
-预期：识别属性抽屉和 ID；OWNER 值为包含星号的原文，不加粗。DIR 不启用附件目录，HEADER-ARGS 不启用代码参数。子项不继承属性。
+Expected: The property drawer and ID are recognized. OWNER retains literal asterisks, DIR does not enable attachments, and HEADER-ARGS does not enable code parameters. Children do not inherit properties.
 
-### S35. 抽屉位置不正确
+### S35. Property drawer in an invalid position
 
 ```org
 * 项目
@@ -440,11 +440,11 @@ https://example.com
 :END:
 ```
 
-预期：空白行使抽屉不紧接标题，因此这些行不定义属性，`ignored` 不进入 ID 候选集合。
+Expected: The blank line prevents the drawer from immediately following the heading, so no properties are defined and `ignored` is not registered as an ID.
 
-### S36. 非法与未闭合抽屉
+### S36. Malformed and unclosed drawers
 
-恢复：E2。
+Recovery: E2.
 
 ```org
 * 非法抽屉
@@ -458,9 +458,9 @@ https://example.com
 * 后续标题
 ```
 
-预期：第一个抽屉整段作为原文，记 `malformed`；第二个开始行回退为文字，记 `unclosed`。两个 ID 均不注册，“后续标题”正常建立。
+Expected: The first drawer is one raw region with `malformed`; the second opener falls back to text with `unclosed`. Neither ID is registered and the later heading is recognized.
 
-### S37. NAME 和 CAPTION 附着与孤立
+### S37. Attached and orphaned NAME and CAPTION
 
 ```org
 #+CAPTION: 一张 *小表*
@@ -471,11 +471,11 @@ https://example.com
 普通段落。
 ```
 
-预期：前两行附着同一张表，题注内有粗体，表名可供链接定位。第二个 CAPTION 不能跨空白行附着段落，作为原文行并记 `orphan`。
+Expected: The first two lines attach to the same table; the caption contains bold and the table name is linkable. The later CAPTION cannot cross a blank line and is an orphan raw line.
 
-## 内容块、注释与脚注
+## Blocks, Comments, and Footnotes
 
-### S38. 代码语言可以省略或未知
+### S38. Optional and unknown code languages
 
 ```org
 #+begin_src
@@ -486,9 +486,9 @@ unknown()
 #+END_SRC
 ```
 
-预期：两个合法代码块，分别没有语言名和带未知语言名；块关键字忽略大小写，不需要执行器或高亮器。
+Expected: Two valid code blocks are recognized, one without a language and one with an unknown language. Keywords are case-insensitive; no executor or highlighter is needed.
 
-### S39. 原样内容、缩进和逗号转义
+### S39. Literal content, indentation, and comma escapes
 
 ```org
 #+BEGIN_EXAMPLE
@@ -502,9 +502,9 @@ unknown()
   #+END_SRC
 ```
 
-预期：示例块内容依次为 `* 原样标题`、`#+END_EXAMPLE`、`,* comma`，没有标题节点；带逗号的结束样式行不提前结束块。代码块内容为两个前导空格加 `indented`，不再按内容最小缩进全部去掉空格。
+Expected: The example body contains a literal heading-style line, `#+END_EXAMPLE`, and `,* comma`; none becomes a heading or prematurely ends the block. The code body keeps two leading spaces before `indented`.
 
-### S40. 引用嵌套与原样子块
+### S40. Nested quotes and literal child blocks
 
 ```org
 #+BEGIN_QUOTE
@@ -518,9 +518,9 @@ unknown()
 #+END_QUOTE
 ```
 
-预期：一个外层引用，含段落、内层引用和代码块；代码中的 END_QUOTE 是代码内容，不关闭外层引用。
+Expected: The outer quote contains a paragraph, nested quote, and code block. END_QUOTE inside the code is literal and does not close the outer quote.
 
-### S41. 注释行和完整注释块
+### S41. Comment lines and closed comment blocks
 
 ```org
 # 这一行是注释，*不加粗*
@@ -532,11 +532,11 @@ unknown()
 * COMMENT 这是普通标题
 ```
 
-预期：注释行和完整注释块不属于正文输出；`#tag` 是普通段落。最后一行建立普通标题，COMMENT 不隐藏它。
+Expected: The comment line and closed comment block are excluded from body output; `#tag` is an ordinary paragraph. The final heading remains a heading and COMMENT does not hide it.
 
-### S42. 未闭合注释和代码
+### S42. Unclosed comments and code
 
-恢复：E2。
+Recovery: E2.
 
 ```org
 #+BEGIN_COMMENT
@@ -547,9 +547,9 @@ print(1)
 * 下一个标题
 ```
 
-预期：没有有效注释块或代码块；两个开始行作为原文并各记 `unclosed`。两个标题都正常建立，后续内容不会因未闭合标记而永久隐藏。
+Expected: No valid comment or code block is created. Both openers fall back to text with `unclosed`; both later headings remain visible.
 
-### S43. 排除的代码参数不被忽略
+### S43. Excluded code parameters are not ignored
 
 ```org
 #+BEGIN_SRC python :results output
@@ -559,11 +559,11 @@ print(1)
 * 真正的标题
 ```
 
-预期：前四行形成一个保留原文的异常区域，记 `unsupported`，不是合法代码块，也不建立内部标题。最后一行才建立标题。不得忽略参数后接受代码块，更不得执行代码。
+Expected: The first four lines form one raw fallback region with `unsupported`, not a valid code block; the heading inside it is not parsed. Only the final line is a heading. The code is not executed.
 
-### S44. 列表容器是块搜索的硬边界
+### S44. List containers bound block searches
 
-恢复：E2。
+Recovery: E2.
 
 ```org
 - 项目
@@ -573,9 +573,9 @@ print(1)
   #+END_SRC
 ```
 
-预期：第一个块不能越过下一列表项寻找结束。其开始行回退，记 `unclosed`；两个项正常存在，第二项里的 END_SRC 是孤立原文行并记 `orphan`。
+Expected: The first block cannot search for its end across the next list item. Its opener falls back with `unclosed`; both items remain and END_SRC in the second item is an orphan raw line.
 
-### S45. 命名脚注与多段正文
+### S45. Named footnotes and multiple paragraphs
 
 ```org
 引用[fn:note]，再次引用[fn:note]。
@@ -588,11 +588,11 @@ print(1)
 回到文档正文。
 ```
 
-预期：两个引用指向同一个两段定义；两个连续空白行结束定义，最后一行为文档正文，不要求脚注正文缩进。
+Expected: Both references resolve to one two-paragraph definition. Two blank lines terminate the definition; the last line is document body. Footnote body indentation is not required.
 
-### S46. 脚注缺失与重复
+### S46. Missing and duplicate footnotes
 
-诊断：unresolved、duplicate。
+Diagnostics: `unresolved`, `duplicate`.
 
 ```org
 引用[fn:missing]和[fn:n]。
@@ -601,19 +601,19 @@ print(1)
 [fn:n] 第二定义。
 ```
 
-预期：missing 引用保留并记 `unresolved`；n 使用第一个定义，第二个完整保留并记 `duplicate`。
+Expected: The missing reference is retained with `unresolved`. The first definition of n takes effect; the second is preserved with `duplicate`.
 
-### S47. 排除的脚注变体
+### S47. Excluded footnote variants
 
 ```org
 匿名[fn::不保留 *格式*]，行内命名[fn:n:也不保留]。
 ```
 
-预期：两个候选分别整体为原文，记 `unsupported`，其中星号不再解析，没有脚注引用或定义。
+Expected: Both candidates remain whole raw text with `unsupported`; their internal asterisks are not parsed and no footnote references or definitions are created.
 
-## 不支持内容与源文保留
+## Unsupported Content and Source Preservation
 
-### S48. 未知块不建立容器
+### S48. Unknown blocks do not form containers
 
 ```org
 #+BEGIN_VERSE
@@ -624,9 +624,9 @@ print(1)
 #+END_warning
 ```
 
-预期：四个定界行分别是原文行，内部按正常上下文建立列表和标题。不会因为存在未知块名就隐藏整个范围。
+Expected: The four delimiter lines are raw lines; the list and heading inside use normal context rules. An unknown block name does not hide its contents.
 
-### S49. 未知和排除的关键字没有副作用
+### S49. Unknown and excluded keywords have no side effects
 
 ```org
 #+INCLUDE: "secret.org"
@@ -636,17 +636,17 @@ print(1)
 #+WHAT: *原文*
 ```
 
-预期：全部为独立原文行；不读取文件、不执行调用、不计算公式、不建立 AUTHOR 元数据。未知关键字行的星号也保持原文。
+Expected: All are separate raw lines: no file is read, call executed, formula evaluated, or AUTHOR metadata created. Asterisks in unknown keyword lines also remain literal.
 
-### S50. 换行、尾随空格、制表符及 EOF
+### S50. Line endings, trailing spaces, tabs, and EOF
 
-输入以字符串转义表示：`"- item\r\n\tcontinuation  \r\n"`。其中 `\r\n` 表示实际 CRLF，`\t` 表示实际制表符，continuation 后有两个实际空格。
+Input as an escaped string: `"- item\r\n\tcontinuation  \r\n"`. Here `\r\n` represents actual CRLF, `\t` an actual tab, and two actual spaces follow `continuation`.
 
-预期：一个列表项；制表符推进到第 8 列，足以构成续行。源文的 CRLF、制表符和两个尾随空格全部保留；移除 C=2 的列表缩进后，续行内容值前面还剩六个空格。相同内容若使用 LF 或去掉最后一个换行，也必须有效。
+Expected: One list item is formed. The tab reaches column 8 and qualifies as a continuation. CRLF, the tab, and both trailing spaces are preserved; removing C=2 indentation leaves six spaces in the interpreted continuation. LF and a missing final newline are also valid.
 
-### S51. 属性键重复与非法 ID 值
+### S51. Duplicate property keys and invalid ID
 
-诊断：duplicate、invalid-value。
+Diagnostics: `duplicate`, `invalid-value`.
 
 ```org
 * 项目
@@ -658,10 +658,10 @@ print(1)
 :END:
 ```
 
-预期：抽屉结构有效；ID 首值非法，记 `invalid-value`，后值重复且不覆盖，两个值均不注册 ID。OWNER 首值 Alice 生效，Bob 原文保留并记 `duplicate`。
+Expected: The drawer is structurally valid. The first ID is invalid and emits `invalid-value`; the duplicate cannot override it and neither is registered. OWNER keeps Alice; Bob remains in the source with `duplicate`.
 
-### S52. 空白与大小写不得自行放宽
+### S52. Whitespace and case are not silently relaxed
 
-输入字符串分别为 `"*\u3000标题"`、`"- [x] 小写"`、`"* 标题"`。`\u3000` 表示实际全角空格。
+The input strings are `"*\u3000标题"`, `"- [x] 小写"`, and `"* 标题"`. `\u3000` denotes an actual full-width space.
 
-预期：第一种不是标题；第二种是普通列表项且没有复选框；第三种是标题。不得把全角空格改成 ASCII 空格或自动把 `[x]` 改成 `[X]`。
+Expected: The first input is not a heading; the second is a list item without a checkbox; the third is a heading. Full-width space is not replaced by ASCII space, and `[x]` is not changed to `[X]`.
