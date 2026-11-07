@@ -19,11 +19,14 @@
     "test": "tsx --test",
     "profile": "0x -D prof ./quartz/bootstrap-cli.mjs build --concurrency=1",
     "install-plugins": "npx tsx ./quartz/plugins/loader/install-plugins.ts",
-    "prebuild": "npm run install-plugins"
+    "prebuild": "npm run install-plugins",
+    "org": "node scripts/org-to-md.mjs",
+    "build": "npm run org && npx quartz build",
+    "preview": "npm run org && npx quartz build --serve"
   },
   "engines": {
     "npm": ">=10.9.2",
-    "node": ">=22"
+    "node": ">=24.12"
   },
   "keywords": [
     "site generator",
@@ -128,6 +131,7 @@
     "@types/ws": "^8.18.1",
     "@types/yargs": "^17.0.35",
     "esbuild": "^0.28.2",
+    "mdast-util-to-markdown": "^2.2.3",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

@@ -4,7 +4,7 @@
 
 设计上只有四条约束，其余都是推论：
 
-1. **数据层只有文档。** `content/` 下全是 Markdown，没有数据库、CMS 和额外的 JSON 数据文件。
+1. **数据层只有文档。** `org/` 下全是 org-lite 文档，没有数据库、CMS 和额外的 JSON 数据文件。
 2. **派生数据只存在于构建期。** 标签、目录、最近更新、阅读时间都是构建时从文档里算出来的。
 3. **功能靠插件扩展。** 功能要么是 npm 上的插件，要么是 `plugins/` 下的本地插件，在 `quartz.config.yaml` 里装配。
 4. **前端不能写回数据层。** 站点是纯静态产物，没有可写的服务端接口。
@@ -13,23 +13,28 @@
 
 ## 快速开始
 
-需要 Node.js >= 22。
+需要 Node.js >= 24.12（org-lite 的要求）。
 
 ```bash
-npm ci                      # 首次安装依赖（用 npm i 也可以）
-npx quartz build --serve    # 本地预览 http://localhost:8080
-npx quartz build            # 只构建，产物在 public/
+npm ci            # 首次安装依赖（用 npm i 也可以）
+npm run org       # org/ → content/，只做转换
+npm run preview   # 转换 + 本地预览 http://localhost:8080
+npm run build     # 转换 + 构建，产物在 public/
 ```
 
+`content/` 是生成物，直接 `npx quartz build` 前记得先 `npm run org`。
 改完 `quartz.config.yaml` 或插件后重启 dev server 最稳妥。
 
 ## 目录结构
 
 ```
-content/            唯一数据源：全部是 Markdown
-  index.md          首页
-  about.md          关于（unlisted）
+org/                唯一数据源：org-lite 文档
+  index.org         首页
+  about.org         关于（unlisted）
   posts/            文章目录，自动生成 /posts 列表页
+content/            org → md 的生成物（已 gitignore）
+scripts/org-to-md.mjs  转换器
+vendor/org-lite/   org-lite 的构建产物（上游仓库私有，故内置）
 quartz.config.yaml  站点参数 + 插件装配 + 页面骨架
 quartz.ts           TS 覆写层：函数型配置、自定义 layout 条件
 plugins/            本地插件（示例：reading-time）
@@ -38,39 +43,58 @@ docs/               Quartz 自带文档，不参与本站构建
 public/             构建产物（已 gitignore）
 ```
 
-`quartz.config.yaml` 里没有内容数据，`content/` 里没有配置。两者不交叉。
+`quartz.config.yaml` 里没有内容数据，`org/` 里没有配置。两者不交叉。
+`content/` 只是中间产物，别手改——下次 `npm run org` 会覆盖它。
 
 ## 写文章
 
-在 `content/posts/` 下新建一个 `.md` 文件即可，文件名就是 URL（slug）。
+在 `org/posts/` 下新建一个 `.org` 文件，文件名就是 URL（slug）。
+文档顶部的 `#+KEY:` 行是元数据，会被转换成 Quartz 需要的 YAML frontmatter：
 
-```markdown
----
-title: 标题
-date: 2025-11-05
-description: 一句话摘要，用于列表页、搜索和 og:description。
-tags:
-  - quartz
----
+```org
+#+TITLE: 标题
+#+DATE: 2025-11-05
+#+DESCRIPTION: 一句话摘要，用于列表页、搜索和 og:description。
+#+TAGS: quartz, architecture
 
 正文……
+
+** 一节
+
+段落，包含 *粗体*、/斜体/、_下划线_、+删除线+、~行内代码~。
 ```
 
-常用的 frontmatter 字段：
+| org 元数据      | frontmatter   | 作用                                                |
+| --------------- | ------------- | --------------------------------------------------- |
+| `#+TITLE`       | `title`       | 标题，缺省时用文件名                                |
+| `#+DATE`        | `date`        | 日期，缺省时回退到文件时间（生成物没有 git 历史）   |
+| `#+DESCRIPTION` | `description` | 摘要，用于列表、搜索、RSS                           |
+| `#+TAGS`        | `tags`        | 空格或逗号分隔，自动生成 `/tags/<tag>` 页面         |
+| `#+DRAFT`       | `draft`       | `true` 时不发布                                     |
+| `#+UNLISTED`    | `unlisted`    | `true` 时不进列表 / RSS / 搜索，但仍可通过 URL 访问 |
+| `#+ALIASES`     | `aliases`     | 旧链接，自动生成跳转页                              |
 
-| 字段          | 作用                                                |
-| ------------- | --------------------------------------------------- |
-| `title`       | 标题，缺省时用文件名                                |
-| `date`        | 日期，缺省时依次回退到 git 提交时间、文件系统时间   |
-| `description` | 摘要，用于列表、搜索、RSS、社交卡片                 |
-| `tags`        | 标签，自动生成 `/tags/<tag>` 页面                   |
-| `draft`       | `true` 时不会发布（`remove-draft` 过滤器）          |
-| `unlisted`    | `true` 时不进列表 / RSS / 搜索，但仍可通过 URL 访问 |
-| `aliases`     | 旧链接，自动生成跳转页                              |
-| `enableToc`   | `false` 时关闭该页右侧目录                          |
+链接一律写 `file:` 形式，转换器会翻译成站内路径：
 
-内链用 `[[posts|全部文章]]` 或普通 Markdown 链接；`crawl-links` 插件配置的是
-`markdownLinkResolution: shortest`，即按文件名就近解析。
+```org
+[[file:posts/][全部文章]]         → /posts/
+[[file:about.org][关于]]          → /about
+[[file:notes.org::*计划][计划]]   → /notes#计划
+[[id:project-001][项目]]          → 跨文档 ID，两遍扫描后解析
+[[https://example.com][外链]]     → 外部链接
+```
+
+`*粗体*` 会转成 `**粗体**`，`/斜体/` → `*斜体*`，`~代码~` → `` `代码` ``，
+`_下划线_` 与上下标走内联 HTML。
+
+### 转换器的边界
+
+- **复选框只有两态**：`[X]` / `[ ]`；`[-]` 会输出 `[ ]` 并用 `<!-- partial -->` 注释保留原状态。
+- **没有 callout**：org-lite 只有 QUOTE 块，`#+BEGIN_QUOTE` 转成 Markdown 引用块。
+- **`#+NAME:` / `#+CAPTION:` 丢弃**：静态博客没有图表编号体系。
+- **`::NN` 行号、`::/正则/` 选择器丢弃**：静态站点里没有对应物。
+- **未知 `#+` 行原样保留为文本**（org-lite 的语义就是如此）。
+- **注释块**（`# 注释` / `#+BEGIN_COMMENT`）不输出。
 
 ## 改站点
 
@@ -177,6 +201,8 @@ npx quartz plugin list                   # 查看已安装
 2. `quartz.ts`：注册了一个自定义 layout 条件 `index`（只在首页渲染），
    用于让 `recent-notes` 只出现在首页。内置条件只有 `not-index` / `has-tags` /
    `has-backlinks` / `has-toc`。
+3. `quartz/util/glob.ts`：`gitignore: false`。`content/` 是生成物且在 `.gitignore` 里，
+   但构建仍要读它；忽略规则统一交给 `quartz.config.yaml` 的 `ignorePatterns`。
 
 ## 部署
 
