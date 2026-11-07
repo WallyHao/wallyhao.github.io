@@ -25,7 +25,7 @@ import process from "node:process"
 import { stringify as stringifyYaml } from "yaml"
 import { toMarkdown } from "mdast-util-to-markdown"
 import GithubSlugger from "github-slugger"
-import { parse } from "../vendor/org-lite/dist/index.js"
+import { parse, positionAt } from "../vendor/org-lite/dist/index.js"
 import { entities } from "../vendor/org-lite/dist/data/entities.js"
 
 // ---------------------------------------------------------------------------
@@ -46,6 +46,11 @@ const raw = (value) => ({ type: "html", value })
 
 const stripTrailingNewline = (s) => s.replace(/\n+$/, "")
 
+/** org-lite 的 span 是 UTF-8 字节偏移，必须按字节切片 */
+function sliceSource(source, span) {
+  return Buffer.from(source, "utf8").subarray(span.start, span.end).toString("utf8")
+}
+
 // ---------------------------------------------------------------------------
 // 元数据
 // ---------------------------------------------------------------------------
@@ -65,7 +70,7 @@ function extractMeta(source) {
     meta[m[1].toUpperCase()] = m[2].trim()
     i += 1
   }
-  return { meta, body: lines.slice(i).join("\n") }
+  return { meta, body: lines.slice(i).join("\n"), lineOffset: i }
 }
 
 function toBool(value) {
@@ -287,7 +292,9 @@ function convertInline(node, ctx) {
     case "target":
       return [raw(`<a id="${escapeHtml(text(node.name))}"></a>`)]
     case "raw_inline":
-      return []
+      // org-lite 把不成立的候选（如 mailto: 链接、未闭合标记）整段放进 raw_inline，
+      // 这里是原文回退区，必须原样输出，否则内容会静默消失。
+      return [{ type: "text", value: sliceSource(ctx.source, node.span) }]
     default:
       return []
   }
@@ -315,7 +322,9 @@ function tableBlock(node, ctx) {
   const width = Math.max(...body.map((r) => r.length))
   const pad = (row) => [...row, ...Array(width - row.length).fill("")]
 
-  const alignCells = rows[0].cells.map((cell) => {
+  const formatRow = node.rows.find((r) => r.kind === "table_row" && r.role === "format")
+  const alignSource = formatRow?.cells ?? rows[0].cells
+  const alignCells = alignSource.map((cell) => {
     const alignment = cell.format?.alignment ?? null
     if (alignment === "left") return ":--"
     if (alignment === "center") return ":-:"
@@ -362,6 +371,9 @@ function convertList(node, ctx) {
 }
 
 function footnoteDefinition(node, ctx) {
+  // org-lite 会保留重复定义并记 duplicate；Markdown 里重复定义是非法的，只取首个
+  if (ctx.footnotes.has(node.label)) return []
+  ctx.footnotes.add(node.label)
   const inner = toMarkdown({
     type: "root",
     children: convertBlocks(node.body, ctx),
@@ -371,7 +383,32 @@ function footnoteDefinition(node, ctx) {
   return [raw(`[^${node.label}]: ${body}`)]
 }
 
+/** #+NAME: / #+CAPTION: 附着在块上，转换成锚点与题注段落 */
+function applyAffiliations(node, out, ctx) {
+  const affiliations = node.affiliations
+  if (!affiliations?.length) return out
+
+  const prefix = []
+  const suffix = []
+  for (const affiliation of affiliations) {
+    if (affiliation.kind === "name") {
+      const name = text(affiliation.value)
+      if (name) prefix.push(raw(`<a id="${escapeHtml(name)}"></a>`))
+    } else if (affiliation.kind === "caption") {
+      const caption = convertInlines(affiliation.value, ctx)
+      if (caption.length) {
+        suffix.push({ type: "paragraph", children: [{ type: "emphasis", children: caption }] })
+      }
+    }
+  }
+  return [...prefix, ...out, ...suffix]
+}
+
 function convertBlock(node, ctx) {
+  return applyAffiliations(node, convertBlockBody(node, ctx), ctx)
+}
+
+function convertBlockBody(node, ctx) {
   switch (node.kind) {
     case "paragraph":
       return [{ type: "paragraph", children: convertInlines(node.content, ctx) }]
@@ -398,10 +435,9 @@ function convertBlock(node, ctx) {
     case "footnote_definition":
       return footnoteDefinition(node, ctx)
     case "latex": {
-      if (node.placement === "inline") {
-        return [raw(`$${stripTrailingNewline(text(node.value))}$`)]
-      }
-      return [raw(`$$\n${stripTrailingNewline(text(node.value))}\n$$`)]
+      const body = text(node.value).replace(/^\n+/, "").replace(/\n+$/, "")
+      if (node.placement === "inline") return [raw(`$${body}$`)]
+      return [raw(`$$\n${body}\n$$`)]
     }
     case "raw_block":
       // 未知 #+ 行：org-lite 只当作普通文本，这里保留下来
@@ -438,9 +474,11 @@ function convertBlocks(nodes, ctx) {
 function convertHeadings(headings, ctx) {
   const out = []
   for (const h of headings) {
-    const customId = h.properties?.entries?.find((e) => e.key.toUpperCase() === "CUSTOM_ID")
-    if (customId) {
-      out.push(raw(`<a id="${escapeHtml(text(customId.value))}"></a>`))
+    for (const entry of h.properties?.entries ?? []) {
+      const key = entry.key.toUpperCase()
+      if (key !== "ID" && key !== "CUSTOM_ID") continue
+      const value = text(entry.value)
+      if (value) out.push(raw(`<a id="${escapeHtml(value)}"></a>`))
     }
     out.push({
       type: "heading",
@@ -467,11 +505,7 @@ function collectIds(document, pagePath) {
         if (key !== "ID" && key !== "CUSTOM_ID") continue
         const value = text(entry.value)
         if (!value) continue
-        found.push({
-          id: value,
-          path: pagePath,
-          anchor: key === "CUSTOM_ID" ? value : "",
-        })
+        found.push({ id: value, path: pagePath, anchor: value })
       }
       visit(h.headings)
     }
@@ -518,19 +552,30 @@ function slugFromPath(relPath) {
 
 function convertFile(source, relPath, ids, slugMaps) {
   const warnings = []
-  const { meta, body } = extractMeta(source)
+  const { meta, body, lineOffset } = extractMeta(source)
 
   const parsed = parse({ id: relPath, text: body, origin: relPath })
   if (!parsed.ok) {
     throw new Error(`解析失败：${JSON.stringify(parsed.error)}`)
   }
   const document = parsed.value.document
+
+  // org-lite 的诊断：unsupported / unclosed / orphan 等意味着这段语法没被识别，
+  // 会按普通文字处理或丢弃，值得提醒作者。
+  const snapshot = { id: relPath, text: body, origin: relPath }
+  for (const diagnostic of parsed.value.diagnostics ?? []) {
+    if (diagnostic.code === "duplicate") continue
+    const position = positionAt(snapshot, diagnostic.location.span.start)
+    const where = position.ok ? `:${position.value.line + 1 + lineOffset}` : ""
+    warnings.push(`${diagnostic.code}${where} ${diagnostic.message}`)
+  }
   const pagePath = slugFromPath(relPath)
 
   const slugMap = collectHeadingSlugs(document)
   const ctx = {
     source: body,
     ids,
+    footnotes: new Set(),
     slugFor: (headingText) => slugMap.get(headingText) ?? slugText(headingText),
     // 跨文档链接：用目标文档自己的 slug 表（同名标题会被编号）
     slugForDoc: (pagePath, headingText) =>
@@ -568,6 +613,18 @@ function walk(dir) {
     } else if (entry.name.toLowerCase().endsWith(".org")) {
       out.push(full)
     }
+  }
+  return out
+}
+
+/** 遍历所有文件（含非 .org），用于同步静态资源 */
+function walkAll(dir) {
+  const out = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".")) continue
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...walkAll(full))
+    else out.push(full)
   }
   return out
 }
@@ -619,11 +676,14 @@ function main() {
   }
 
   const manifestPath = path.join(outDir, ".org-to-md.json")
-  const previous = fs.existsSync(manifestPath)
-    ? (JSON.parse(fs.readFileSync(manifestPath, "utf8")).generated ?? [])
-    : []
+  const manifest = fs.existsSync(manifestPath)
+    ? JSON.parse(fs.readFileSync(manifestPath, "utf8"))
+    : {}
+  const previous = manifest.generated ?? []
+  const previousAssets = manifest.assets ?? []
 
   const generated = []
+  const copiedAssets = []
   let failed = 0
   let warned = 0
 
@@ -649,16 +709,31 @@ function main() {
     }
   }
 
+  // org/ 里的图片等静态资源同步到 content/，让文件链接能正常访问
+  const assetFiles = walkAll(srcDir).filter((fp) => !fp.toLowerCase().endsWith(".org"))
+  for (const fp of assetFiles) {
+    const rel = path.relative(srcDir, fp)
+    if (opts.check) continue
+    const target = path.join(outDir, rel)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.copyFileSync(fp, target)
+    copiedAssets.push(rel)
+  }
+
   if (!opts.check) {
-    for (const stale of previous) {
-      if (!generated.includes(stale)) {
+    for (const stale of [...previous, ...previousAssets]) {
+      const keep = generated.includes(stale) || copiedAssets.includes(stale)
+      if (!keep) {
         const target = path.join(outDir, stale)
         if (fs.existsSync(target)) fs.unlinkSync(target)
         console.log(`  - 删除过期产物 ${path.join(opts.out, stale)}`)
       }
     }
     fs.mkdirSync(outDir, { recursive: true })
-    fs.writeFileSync(manifestPath, JSON.stringify({ generated }, null, 2) + "\n")
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ generated, assets: copiedAssets }, null, 2) + "\n",
+    )
   }
 
   console.log(
