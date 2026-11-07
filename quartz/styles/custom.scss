@@ -63,6 +63,10 @@
   --text-accent-hover: #894e54;
   --interactive-accent: #144a74;
   --interactive-accent-hover: #894e54;
+
+  // ink-paper 用 mask-image 画工具按钮图标，颜料来自这个变量；
+  // 它的浅色块里这个值算出来是空的，导致图标透明不可见，这里显式钉死。
+  --quartz-icon-color: #4f4a40;
 }
 
 // ---- 玄墨 Dimmed（深色）--------------------------------------------------
@@ -104,6 +108,7 @@
   --text-accent-hover: #c57f73;
   --interactive-accent: #66a9c9;
   --interactive-accent-hover: #c57f73;
+  --quartz-icon-color: #b0a99f;
 }
 
 // ---- 排版微调 ------------------------------------------------------------

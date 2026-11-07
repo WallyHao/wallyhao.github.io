@@ -147,8 +147,11 @@ plugins:
     order: 75
 
   # --- 前端资源 / 字体 ------------------------------------------------------
+  # 关闭：它自带一套 header/body/code 默认值（Schibsted Grotesk / Source Sans Pro），
+  # 会无视 configuration.theme.typography 并注入 h1..h6 的 font-family，
+  # 还会往 <head> 塞一条 Google Fonts 链接。本站字体自托管，用不上。
   - source: "@quartz-community/quartz-fonts"
-    enabled: true
+    enabled: false
 
   # 结构/排版来自 ink-paper，配色与字体由 quartz/styles/custom.scss 覆盖
   - source: "@quartz-themes/core"
