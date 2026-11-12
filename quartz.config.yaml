@@ -306,9 +306,11 @@ plugins:
       position: footer
       priority: 50
 
-  # Recent posts list on the home page
+  # Recent posts list on the home page.
+  # Disabled while the site has no posts: with nothing to list it renders an
+  # empty "最近更新" heading. Re-enable together with the first post.
   - source: "@quartz-community/recent-notes"
-    enabled: true
+    enabled: false
     options:
       title: 最近更新
       limit: 5
